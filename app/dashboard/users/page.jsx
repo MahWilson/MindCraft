@@ -11,6 +11,7 @@ export default function UsersPage() {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filterRole, setFilterRole] = useState('all');
 	const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+	const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
 	useEffect(() => {
 		fetchUsers();
@@ -80,10 +81,16 @@ export default function UsersPage() {
 			backgroundColor: '#f8fafc',
 			fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 		}}>
-			<Sidebar currentPage="users" />
+			<Sidebar currentPage="users" onToggle={setSidebarMinimized} />
 
 			{/* Main Content */}
-			<div style={{ marginLeft: '280px', padding: '32px 40px', transition: 'margin-left 0.3s ease-in-out' }}>
+			<div style={{ 
+				marginLeft: sidebarMinimized ? '80px' : '280px', 
+				padding: '32px 40px', 
+				transition: 'margin-left 0.3s ease-in-out',
+				minHeight: '100vh',
+				boxSizing: 'border-box'
+			}}>
 				{/* Header */}
 				<div style={{ 
 					marginBottom: '32px',
@@ -92,39 +99,23 @@ export default function UsersPage() {
 					padding: '32px',
 					boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
 				}}>
-					<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-						<div>
-							<h1 style={{ 
-								fontSize: '36px', 
-								fontWeight: '800', 
-								color: '#1e293b',
-								margin: '0 0 8px 0' 
-							}}>
-								User Management
-							</h1>
-							<p style={{ 
-								color: '#64748b', 
-								fontSize: '16px', 
-								margin: 0,
-								fontWeight: '500'
-							}}>
-								Manage your platform users with style and efficiency
-							</p>
-						</div>
-						<div style={{
-							backgroundColor: '#3b82f6',
-							borderRadius: '50%',
-							width: '80px',
-							height: '80px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+					<div>
+						<h1 style={{ 
+							fontSize: '36px', 
+							fontWeight: '800', 
+							color: '#1e293b',
+							margin: '0 0 8px 0' 
 						}}>
-							<svg width="40" height="40" fill="white" viewBox="0 0 24 24">
-								<path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-							</svg>
-						</div>
+							User Management
+						</h1>
+						<p style={{ 
+							color: '#64748b', 
+							fontSize: '16px', 
+							margin: 0,
+							fontWeight: '500'
+						}}>
+							Manage your platform users with style and efficiency
+						</p>
 					</div>
 				</div>
 
