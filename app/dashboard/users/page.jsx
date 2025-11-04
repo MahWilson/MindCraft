@@ -136,10 +136,10 @@ export default function UsersPage() {
 					marginBottom: '32px' 
 				}}>
 					{[
-						{ label: 'Total Users', value: users.length, icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1z' },
+						{ label: 'Total Users', value: users.length },
 						{ label: 'Students', value: users.filter(u => u.role === 'student').length, icon: 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5' },
-						{ label: 'Teachers', value: users.filter(u => u.role === 'teacher').length, icon: 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 717.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5' },
-						{ label: 'Active Users', value: users.filter(u => u.status === 'active').length, icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }
+						{ label: 'Teachers', value: users.filter(u => u.role === 'teacher').length },
+						{ label: 'Active Users', value: users.filter(u => u.status === 'active').length }
 					].map((stat, index) => (
 						<div key={index} style={{
 							backgroundColor: 'white',
@@ -157,7 +157,7 @@ export default function UsersPage() {
 							e.currentTarget.style.transform = 'translateY(0)';
 							e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
 						}}>
-							<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+							<div style={{ marginBottom: '16px' }}>
 								<div style={{ 
 									color: '#64748b', 
 									fontSize: '14px', 
@@ -166,19 +166,6 @@ export default function UsersPage() {
 									letterSpacing: '0.5px'
 								}}>
 									{stat.label}
-								</div>
-								<div style={{
-									backgroundColor: '#3b82f6',
-									borderRadius: '12px',
-									padding: '8px',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-								}}>
-									<svg width="20" height="20" fill="white" viewBox="0 0 24 24">
-										<path d={stat.icon} />
-									</svg>
 								</div>
 							</div>
 							<div style={{ 
@@ -264,36 +251,36 @@ export default function UsersPage() {
 								<button
 									onClick={() => setViewMode('grid')}
 									style={{
-										padding: '8px 16px',
+										padding: '8px 12px',
 										border: 'none',
 										borderRadius: '6px',
 										backgroundColor: viewMode === 'grid' ? '#3b82f6' : 'transparent',
 										color: viewMode === 'grid' ? 'white' : '#64748b',
 										cursor: 'pointer',
 										transition: 'all 0.2s ease',
-										fontSize: '13px',
-										fontWeight: '500',
 										boxShadow: viewMode === 'grid' ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none'
 									}}
 								>
-									Grid
+									<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+										<path d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z" />
+									</svg>
 								</button>
 								<button
 									onClick={() => setViewMode('table')}
 									style={{
-										padding: '8px 16px',
+										padding: '8px 12px',
 										border: 'none',
 										borderRadius: '6px',
 										backgroundColor: viewMode === 'table' ? '#3b82f6' : 'transparent',
 										color: viewMode === 'table' ? 'white' : '#64748b',
 										cursor: 'pointer',
 										transition: 'all 0.2s ease',
-										fontSize: '13px',
-										fontWeight: '500',
 										boxShadow: viewMode === 'table' ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none'
 									}}
 								>
-									Table
+									<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+										<path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
+									</svg>
 								</button>
 							</div>
 						</div>
@@ -680,21 +667,6 @@ function UserList({ users, onUserUpdate, viewMode }) {
 				textAlign: 'center',
 				boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
 			}}>
-				<div style={{
-					width: '120px',
-					height: '120px',
-					backgroundColor: '#3b82f6',
-					borderRadius: '50%',
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					margin: '0 auto 24px',
-					boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-				}}>
-					<svg width="60" height="60" fill="white" viewBox="0 0 24 24">
-						<path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-					</svg>
-				</div>
 				<h3 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', margin: '0 0 12px 0' }}>
 					No users found
 				</h3>
