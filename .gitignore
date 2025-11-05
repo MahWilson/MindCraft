@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables (secrets - never commit!)
+.env
+.env.local
+.env*.local
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Firebase local emulators/state
+.firebase/
+.firebaserc.local
+
+# Coverage
+coverage/
+
+# Misc
+*.local
+
