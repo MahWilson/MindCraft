@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import DeleteUser from './delete/DeleteUser';
 
 export default function UsersPage() {
 	const [users, setUsers] = useState([]);
@@ -648,6 +649,7 @@ function CreateUserForm({ onClose, onSuccess }) {
 
 function UserList({ users, onUserUpdate, viewMode }) {
 	const [editingUser, setEditingUser] = useState(null);
+	const [userToDelete, setUserToDelete] = useState(null);
 
 	if (users.length === 0) {
 		return (
@@ -973,6 +975,16 @@ function UserList({ users, onUserUpdate, viewMode }) {
 					onClose={() => setEditingUser(null)}
 					onSuccess={() => {
 						setEditingUser(null);
+						onUserUpdate();
+					}}
+				/>
+			)}
+			{userToDelete && (
+				<DeleteUser
+					user={userToDelete}
+					onClose={() => setUserToDelete(null)}
+					onSuccess={() => {
+						setUserToDelete(null);
 						onUserUpdate();
 					}}
 				/>
