@@ -1,0 +1,2 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# Note: We're using .env for development (not .env.local) so Cursor can access it
