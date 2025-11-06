@@ -1024,6 +1024,7 @@ function EditUserForm({ user, onClose, onSuccess }) {
 	const [formData, setFormData] = useState({
 		name: user.name || '',
 		email: user.email || '',
+		username: user.username || '',
 		class: user.class || '',
 		status: user.status || 'active'
 	});
@@ -1165,6 +1166,42 @@ function EditUserForm({ user, onClose, onSuccess }) {
 								e.target.style.borderColor = '#d1d5db';
 								e.target.style.boxShadow = 'none';
 							}}
+						/>
+					</div>
+
+					<div style={{ marginBottom: '16px' }}>
+						<label style={{ 
+							display: 'block', 
+							marginBottom: '6px',
+							fontSize: '13px',
+							fontWeight: '500',
+							color: '#374151'
+						}}>
+							Username
+						</label>
+						<input
+							required
+							value={formData.username}
+							onChange={(e) => setFormData({...formData, username: e.target.value})}
+							style={{ 
+								width: '100%', 
+								padding: '10px 12px', 
+								border: '1px solid #d1d5db', 
+								borderRadius: '6px',
+								fontSize: '14px',
+								outline: 'none',
+								transition: 'all 0.2s',
+								backgroundColor: 'white'
+							}}
+							onFocus={(e) => {
+								e.target.style.borderColor = '#3b82f6';
+								e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+							}}
+							onBlur={(e) => {
+								e.target.style.borderColor = '#d1d5db';
+								e.target.style.boxShadow = 'none';
+							}}
+							placeholder="Enter username"
 						/>
 					</div>
 
