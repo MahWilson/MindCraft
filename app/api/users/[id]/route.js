@@ -3,16 +3,16 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '../../../../firebase.js';
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 
 export async function PUT(request, { params }) {
 	try {
 		const { id } = params;
 		const body = await request.json();
-		const { name, email, class: userClass, status } = body;
+		const { name, email, username, class: userClass, status } = body;
 
 		// Basic validation
-		if (!name && !email && !userClass && !status) {
+		if (!name && !email && !username && !userClass && !status) {
 			return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
 		}
 
@@ -24,6 +24,15 @@ export async function PUT(request, { params }) {
 			return NextResponse.json({ error: 'User not found' }, { status: 404 });
 		}
 
+		// Check for duplicate username if username is being updated
+		if (username && username !== userDoc.data().username) {
+			const usernameQuery = query(collection(db, 'users'), where('username', '==', username));
+			const usernameSnapshot = await getDocs(usernameQuery);
+			if (!usernameSnapshot.empty) {
+				return NextResponse.json({ error: 'Username already exists' }, { status: 409 });
+			}
+		}
+
 		// Prepare update data
 		const updateData = {
 			updatedAt: serverTimestamp(),
@@ -31,6 +40,7 @@ export async function PUT(request, { params }) {
 
 		if (name) updateData.name = name;
 		if (email) updateData.email = email;
+		if (username) updateData.username = username;
 		if (userClass !== undefined) updateData.class = userClass;
 		if (status) updateData.status = status;
 
