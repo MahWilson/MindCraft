@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -29,19 +29,22 @@ export default function ManageUsersPage() {
 
 	const loadUsers = async () => {
 		try {
-			const response = await fetch('/api/users');
-			if (!response.ok) {
-				if (response.status === 403) {
-					router.push('/dashboard/admin');
-					return;
-				}
-				throw new Error('Failed to load users');
-			}
-			const data = await response.json();
-			setUsers(data.users || []);
+			// Fetch directly from Firestore (client-side has auth context)
+			const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+			const usersSnapshot = await getDocs(usersQuery);
+			const usersList = usersSnapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+			setUsers(usersList);
 		} catch (err) {
 			console.error('Error loading users:', err);
-			setError('Failed to load users');
+			// Check if it's a permission error
+			if (err.code === 'permission-denied') {
+				setError('Permission denied. Please check Firestore security rules. Make sure you are logged in and have admin role.');
+			} else {
+				setError('Failed to load users: ' + (err.message || 'Unknown error'));
+			}
 		} finally {
 			setLoading(false);
 		}
