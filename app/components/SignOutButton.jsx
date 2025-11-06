@@ -3,6 +3,7 @@
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 export default function SignOutButton() {
 	const router = useRouter();
@@ -15,22 +16,23 @@ export default function SignOutButton() {
 			// Clear cookies via API
 			await fetch('/api/auth/logout', { method: 'POST' });
 			
-			// Redirect to home
-			router.push('/');
+			// Force full page reload to ensure server sees cleared cookies
+			window.location.href = '/';
 		} catch (err) {
 			console.error('Sign out error:', err);
 			// Still redirect even if there's an error
-			router.push('/');
+			window.location.href = '/';
 		}
 	}
 
 	return (
-		<button
+		<Button
 			onClick={handleSignOut}
-			className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+			variant="destructive"
+			size="sm"
 		>
 			Sign Out
-		</button>
+		</Button>
 	);
 }
 

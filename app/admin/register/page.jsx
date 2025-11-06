@@ -5,6 +5,9 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function AdminRegisterPage() {
 	const [name, setName] = useState('');
@@ -62,50 +65,67 @@ export default function AdminRegisterPage() {
 	}
 
 	return (
-		<div className="max-w-sm mx-auto bg-white border rounded p-4">
-			<h1 className="text-lg font-semibold mb-3">Register Teacher/Student</h1>
-			<form onSubmit={onSubmit} className="space-y-3">
-				<input
-					required
-					className="w-full border rounded p-2"
-					placeholder="Full name"
-					value={name}
-					onChange={(e) => setName(e.target.value)}
-				/>
-				<input
-					required
-					type="email"
-					className="w-full border rounded p-2"
-					placeholder="Email"
-					value={email}
-					onChange={(e) => setEmail(e.target.value)}
-				/>
-				<input
-					required
-					type="password"
-					className="w-full border rounded p-2"
-					placeholder="Password (min 6 characters)"
-					value={password}
-					onChange={(e) => setPassword(e.target.value)}
-					minLength={6}
-				/>
-				<select className="w-full border rounded p-2" value={role} onChange={(e) => setRole(e.target.value)}>
-					<option value="teacher">Teacher</option>
-					<option value="student">Student</option>
-				</select>
-				<button
-					className="w-full bg-blue-600 text-white rounded py-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-					type="submit"
-					disabled={loading}
-				>
-					{loading ? 'Creating...' : 'Create account'}
-				</button>
-			</form>
-			{error ? <p className="text-red-600 mt-2 text-sm">{error}</p> : null}
-			{ok ? <p className="text-green-600 mt-2 text-sm">{ok}</p> : null}
-			<p className="text-xs text-gray-500 mt-3">
-				Admin must be signed in to use this page. The user will be created in Firebase Auth and Firestore.
-			</p>
+		<div className="max-w-md mx-auto">
+			<h1 className="text-h1 text-neutralDark mb-8">Register Teacher/Student</h1>
+			<Card>
+				<CardContent className="pt-6">
+					<form onSubmit={onSubmit} className="space-y-4">
+						<Input
+							required
+							placeholder="Full name"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+						/>
+						<Input
+							required
+							type="email"
+							placeholder="Email"
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+						/>
+						<Input
+							required
+							type="password"
+							placeholder="Password (min 6 characters)"
+							value={password}
+							onChange={(e) => setPassword(e.target.value)}
+							minLength={6}
+						/>
+						<select 
+							className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
+							value={role} 
+							onChange={(e) => setRole(e.target.value)}
+						>
+							<option value="teacher">Teacher</option>
+							<option value="student">Student</option>
+						</select>
+						<Button
+							className="w-full"
+							type="submit"
+							disabled={loading}
+						>
+							{loading ? 'Creating...' : 'Create account'}
+						</Button>
+					</form>
+					{error ? (
+						<Card className="mt-4 border-error bg-error/5">
+							<CardContent className="pt-6">
+								<p className="text-body text-error">{error}</p>
+							</CardContent>
+						</Card>
+					) : null}
+					{ok ? (
+						<Card className="mt-4 border-success bg-success/5">
+							<CardContent className="pt-6">
+								<p className="text-body text-success">{ok}</p>
+							</CardContent>
+						</Card>
+					) : null}
+					<p className="text-caption text-muted-foreground mt-6">
+						Admin must be signed in to use this page. The user will be created in Firebase Auth and Firestore.
+					</p>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

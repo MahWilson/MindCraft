@@ -1,7 +1,7 @@
 import '../styles/globals.css';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
-import SignOutButton from './components/SignOutButton';
+import Sidebar from '@/components/Sidebar';
+import Header from '@/components/Header';
 
 export const metadata = {
 	title: 'MindCraft',
@@ -18,7 +18,10 @@ function getNavItems(role) {
 		return [
 			{ href: '/dashboard/admin', label: 'Dashboard' },
 			{ href: '/admin/register', label: 'Register Users' },
+			{ href: '/admin/users', label: 'Manage Users' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
+			{ href: '/dashboard/modules', label: 'Module Library' },
+			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
 		];
 	} else if (role === 'teacher') {
@@ -26,6 +29,8 @@ function getNavItems(role) {
 			{ href: '/dashboard/teacher', label: 'Dashboard' },
 			{ href: '/dashboard/courses/new', label: 'Create Course' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
+			{ href: '/dashboard/modules', label: 'Module Library' },
+			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Grade Assignments' },
 			{ href: '/analytics', label: 'Analytics' },
@@ -34,6 +39,8 @@ function getNavItems(role) {
 		return [
 			{ href: '/dashboard/student', label: 'Dashboard' },
 			{ href: '/courses', label: 'My Courses' },
+			{ href: '/courses/explore', label: 'Explore Courses' },
+			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/progress', label: 'Progress' },
 			{ href: '/forum', label: 'Forum' },
@@ -53,41 +60,19 @@ export default async function RootLayout({ children }) {
 
 	return (
 		<html lang="en">
-			<body className="min-h-screen">
+			<body className="min-h-screen bg-neutralLight">
 				<div className="flex min-h-screen">
-					<aside className="hidden md:flex w-64 flex-col bg-white border-r">
-						<Link href="/" className="p-4 text-xl font-bold">
-							MindCraft
-						</Link>
-						<div className="px-4 py-2 text-xs text-gray-500 capitalize">{role === 'guest' ? 'Guest' : role}</div>
-						<nav className="px-2 space-y-1 flex-1">
-							{navItems.map((item) => (
-								<Link key={item.href} className="block px-3 py-2 rounded hover:bg-gray-100" href={item.href}>
-									{item.label}
-								</Link>
-							))}
-						</nav>
-					</aside>
-					<main className="flex-1">
-						<header className="sticky top-0 z-10 bg-white border-b">
-							<div className="flex items-center justify-between h-14 px-4">
-								<div className="md:hidden font-bold">MindCraft</div>
-								<div className="flex items-center gap-4 ml-auto">
-									{role === 'guest' ? (
-										<Link href="/login" className="text-sm text-blue-600 hover:underline">
-											Sign In
-										</Link>
-									) : (
-										<>
-											<span className="text-sm text-gray-600 capitalize">{role}</span>
-											<SignOutButton />
-										</>
-									)}
-								</div>
-							</div>
-						</header>
-						<div className="p-4">{children}</div>
-					</main>
+					{/* Sidebar - in normal flow, takes up space */}
+					<Sidebar role={role} navItems={navItems} />
+					
+					{/* Main content area */}
+					<div className="flex-1 flex flex-col min-w-0">
+						{/* Header - spans rest of width */}
+						<Header role={role} />
+						
+						{/* Main content */}
+						<main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">{children}</main>
+					</div>
 				</div>
 			</body>
 		</html>

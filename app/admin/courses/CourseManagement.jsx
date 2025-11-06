@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export default function CourseManagement({ course, currentUserId, currentRole }) {
 	const [loading, setLoading] = useState(false);
@@ -70,58 +72,93 @@ export default function CourseManagement({ course, currentUserId, currentRole })
 	}
 
 	return (
-		<div className="bg-white border rounded-lg p-4">
-			<h3 className="font-semibold mb-2">{course.title}</h3>
-			<p className="text-sm text-gray-600 mb-2 line-clamp-2">{course.description || 'No description'}</p>
-			<div className="text-xs text-gray-500 mb-3 space-y-1">
-				<div>Author: {course.authorName || 'Unknown'}</div>
-				<div>Created: {course.createdAt?.toDate ? course.createdAt.toDate().toLocaleDateString() : 'N/A'}</div>
-				{course.status === 'published' && (
-					<div>Published: {course.updatedAt?.toDate ? course.updatedAt.toDate().toLocaleDateString() : 'N/A'}</div>
+		<Card className="card-hover">
+			<CardHeader>
+				<div className="flex items-start justify-between gap-3">
+					<div className="flex-1 min-w-0">
+						<CardTitle className="text-h3 mb-2 line-clamp-2">{course.title}</CardTitle>
+						<CardDescription className="line-clamp-2 mb-4">
+							{course.description || 'No description provided'}
+						</CardDescription>
+					</div>
+					<span className={`px-3 py-1 rounded-full text-caption font-medium whitespace-nowrap ${
+						course.status === 'published' 
+							? 'bg-success/10 text-success' 
+							: 'bg-warning/10 text-warning'
+					}`}>
+						{course.status === 'published' ? 'Published' : 'Draft'}
+					</span>
+				</div>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				<div className="text-caption text-muted-foreground space-y-1">
+					<div className="flex items-center gap-2">
+						<span className="font-medium">Author:</span>
+						<span>{course.authorName || 'Unknown'}</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<span className="font-medium">Created:</span>
+						<span>{course.createdAt?.toDate ? course.createdAt.toDate().toLocaleDateString() : 'N/A'}</span>
+					</div>
+					{course.status === 'published' && course.updatedAt && (
+						<div className="flex items-center gap-2">
+							<span className="font-medium">Published:</span>
+							<span>{course.updatedAt?.toDate ? course.updatedAt.toDate().toLocaleDateString() : 'N/A'}</span>
+						</div>
+					)}
+				</div>
+				<div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
+					{course.status === 'draft' && canEdit && (
+						<Button
+							onClick={handlePublish}
+							disabled={loading}
+							size="sm"
+							className="flex-1 sm:flex-none"
+						>
+							Publish
+						</Button>
+					)}
+					{course.status === 'published' && canEdit && (
+						<Button
+							onClick={handleUnpublish}
+							disabled={loading}
+							variant="outline"
+							size="sm"
+							className="border-warning text-warning hover:bg-warning/10 flex-1 sm:flex-none"
+						>
+							Unpublish
+						</Button>
+					)}
+					{canEdit && (
+						<a href={`/dashboard/courses/${course.id}/edit`}>
+							<Button
+								variant="outline"
+								size="sm"
+								className="flex-1 sm:flex-none"
+							>
+								Edit
+							</Button>
+						</a>
+					)}
+					{canDelete && (
+						<Button
+							onClick={handleDelete}
+							disabled={loading}
+							variant="destructive"
+							size="sm"
+							className="flex-1 sm:flex-none"
+						>
+							Delete
+						</Button>
+					)}
+				</div>
+				{error && (
+					<div className="p-3 rounded-lg bg-error/10 border border-error/20">
+						<p className="text-caption text-error">{error}</p>
+					</div>
 				)}
-			</div>
-			<div className="flex items-center gap-2 flex-wrap">
-				{course.status === 'draft' && canEdit && (
-					<button
-						onClick={handlePublish}
-						disabled={loading}
-						className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-					>
-						Publish
-					</button>
-				)}
-				{course.status === 'published' && canEdit && (
-					<button
-						onClick={handleUnpublish}
-						disabled={loading}
-						className="px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-					>
-						Unpublish
-					</button>
-				)}
-				{canEdit && (
-					<a
-						href={`/dashboard/courses/${course.id}/edit`}
-						className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
-					>
-						Edit
-					</a>
-				)}
-				{canDelete && (
-					<button
-						onClick={handleDelete}
-						disabled={loading}
-						className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-					>
-						Delete
-					</button>
-				)}
-				<span className={`px-2 py-1 rounded text-xs ${course.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-					{course.status === 'published' ? 'Published' : 'Draft'}
-				</span>
-			</div>
-			{error && <p className="text-xs text-red-600 mt-2">{error}</p>}
-		</div>
+			</CardContent>
+		</Card>
 	);
 }
 

@@ -2,7 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Basic app chrome */
-body { color: #111827; background: #F5F9FF; }
+/* Rich Text Editor Styles */
+.rich-text-editor .ql-container {
+	min-height: 200px;
+	font-size: 16px;
+	font-family: inherit;
+}
+
+.rich-text-editor .ql-editor {
+	min-height: 200px;
+}
+
+.rich-text-editor .ql-editor.ql-blank::before {
+	color: #9ca3af;
+	font-style: normal;
+}
+
+.rich-text-editor .ql-toolbar {
+	border-top-left-radius: 0.5rem;
+	border-top-right-radius: 0.5rem;
+	border: 1px solid #e5e7eb;
+}
+
+.rich-text-editor .ql-container {
+	border-bottom-left-radius: 0.5rem;
+	border-bottom-right-radius: 0.5rem;
+	border: 1px solid #e5e7eb;
+	border-top: none;
+}
+
+.rich-text-editor .ql-container.ql-snow {
+	border: 1px solid #e5e7eb;
+	border-top: none;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow {
+	border: 1px solid #e5e7eb;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@layer base {
+	:root {
+		--background: 0 0% 100%;
+		--foreground: 220 13% 10%;
+		--card: 0 0% 100%;
+		--card-foreground: 220 13% 10%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 220 13% 10%;
+		--primary: 234 89% 65%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 45 100% 74%;
+		--secondary-foreground: 220 13% 10%;
+		--muted: 210 40% 96.1%;
+		--muted-foreground: 215.4 16.3% 46.9%;
+		--accent: 210 40% 96.1%;
+		--accent-foreground: 220 13% 10%;
+		--destructive: 0 84.2% 60.2%;
+		--destructive-foreground: 0 0% 100%;
+		--border: 214.3 31.8% 91.4%;
+		--input: 214.3 31.8% 91.4%;
+		--ring: 234 89% 65%;
+		--radius: 0.5rem;
+	}
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+	body {
+		@apply bg-neutralLight text-neutralDark;
+		font-family: 'Inter', system-ui, -apple-system, sans-serif;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+	
+	/* Typography hierarchy */
+	h1 {
+		@apply text-h1 font-semibold;
+	}
+	
+	h2 {
+		@apply text-h2 font-semibold;
+	}
+	
+	h3 {
+		@apply text-h3 font-medium;
+	}
+	
+	p {
+		@apply text-body;
+	}
+}
+
+/* Custom utility classes for MindCraft UI */
+@layer components {
+	.primary-btn {
+		@apply bg-primary text-white rounded-lg px-5 py-2 font-medium hover:opacity-90 transition-all duration-200;
+	}
+	
+	.secondary-btn {
+		@apply bg-neutralDark text-white rounded-lg px-5 py-2 font-medium hover:opacity-90 transition-all duration-200;
+	}
+	
+	.ghost-btn {
+		@apply hover:bg-neutralLight px-4 py-2 rounded-md transition-all duration-200;
+	}
+	
+	/* Card with subtle hover animation */
+	.card {
+		@apply rounded-xl p-6 shadow-md bg-white hover:shadow-lg transition-all duration-200;
+	}
+	
+	.card-hover {
+		@apply card hover:scale-105;
+	}
+}
 
 
