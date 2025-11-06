@@ -1,0 +1,24 @@
+[
+  {
+    "id": "8504212c-b992-42a4-b1be-8dbd07cae4e4",
+    "title": "Test Course 1",
+    "description": "testing1",
+    "status": "published",
+    "modules": [],
+    "createdBy": null,
+    "createdAt": "2025-11-04T17:34:19.915Z",
+    "updatedAt": "2025-11-04T17:47:25.850Z"
+  },
+  {
+    "id": "c3e6eb88-b7e8-4908-a02f-77c9ebbfe70d",
+    "title": "dasdasd",
+    "description": "sdadas",
+    "status": "draft",
+    "modules": [],
+    "createdBy": "29c13350-077c-4ba1-985c-f4087013c07b",
+    "authorName": "teach1",
+    "authorEmail": "teach1@gmail.com",
+    "createdAt": "2025-11-04T17:49:16.743Z",
+    "updatedAt": "2025-11-04T17:49:16.743Z"
+  }
+]

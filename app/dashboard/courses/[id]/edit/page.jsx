@@ -6,6 +6,10 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db } from '@/firebase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import CourseModuleManager from '@/app/components/CourseModuleManager';
 
 export default function EditCoursePage() {
 	const params = useParams();
@@ -124,58 +128,86 @@ export default function EditCoursePage() {
 	}
 
 	return (
-		<div className="max-w-2xl mx-auto">
-			<h1 className="text-2xl font-bold mb-6">Edit Course</h1>
-			<form onSubmit={onSubmit} className="bg-white border rounded-lg p-6 space-y-4">
-				<label className="block">
-					<span className="block text-sm font-medium text-gray-700 mb-1">Title</span>
-					<input
-						required
-						type="text"
-						value={title}
-						onChange={(e) => setTitle(e.target.value)}
-						className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+		<div className="max-w-4xl mx-auto space-y-8">
+			<div>
+				<h1 className="text-h1 text-neutralDark mb-2">Edit Course</h1>
+				<p className="text-body text-muted-foreground">Update course details and manage modules & lessons</p>
+			</div>
+
+			<Card>
+				<CardContent className="pt-6">
+					<form onSubmit={onSubmit} className="space-y-6">
+						<label className="block">
+							<span className="block text-body font-medium text-neutralDark mb-2">Title</span>
+							<Input
+								required
+								type="text"
+								value={title}
+								onChange={(e) => setTitle(e.target.value)}
+								placeholder="Enter course title"
+							/>
+						</label>
+
+						<label className="block">
+							<span className="block text-body font-medium text-neutralDark mb-2">Description</span>
+							<textarea
+								value={description}
+								onChange={(e) => setDescription(e.target.value)}
+								rows={4}
+								className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-body ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
+								placeholder="Enter course description"
+							/>
+						</label>
+
+						<label className="block">
+							<span className="block text-body font-medium text-neutralDark mb-2">Status</span>
+							<select
+								value={status}
+								onChange={(e) => setStatus(e.target.value)}
+								className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
+							>
+								<option value="draft">Draft</option>
+								<option value="published">Published</option>
+							</select>
+						</label>
+
+						<div className="pt-4 border-t border-border">
+							<Button
+								type="submit"
+								disabled={submitting}
+								className="w-full"
+								size="lg"
+							>
+								{submitting ? 'Saving…' : 'Save Changes'}
+							</Button>
+						</div>
+					</form>
+				</CardContent>
+			</Card>
+
+			{/* Modules & Lessons Manager */}
+			<Card>
+				<CardContent className="pt-6">
+					<CourseModuleManager
+						courseId={courseId}
+						onModulesChange={() => {}}
 					/>
-				</label>
-
-				<label className="block">
-					<span className="block text-sm font-medium text-gray-700 mb-1">Description</span>
-					<textarea
-						value={description}
-						onChange={(e) => setDescription(e.target.value)}
-						rows={4}
-						className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-					/>
-				</label>
-
-				<label className="block">
-					<span className="block text-sm font-medium text-gray-700 mb-1">Status</span>
-					<select
-						value={status}
-						onChange={(e) => setStatus(e.target.value)}
-						className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-					>
-						<option value="draft">Draft</option>
-						<option value="published">Published</option>
-					</select>
-				</label>
-
-				<div className="pt-4">
-					<button
-						type="submit"
-						disabled={submitting}
-						className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-					>
-						{submitting ? 'Saving…' : 'Save Changes'}
-					</button>
-				</div>
-			</form>
+				</CardContent>
+			</Card>
 
 			{error && (
-				<div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+				<Card className="border-error bg-error/5">
+					<CardContent className="pt-6">
+						<p className="text-body text-error">{error}</p>
+					</CardContent>
+				</Card>
 			)}
 			{success && (
-				<div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{success}</div>
+				<Card className="border-success bg-success/5">
+					<CardContent className="pt-6">
+						<p className="text-body text-success">{success}</p>
+					</CardContent>
+				</Card>
 			)}
 		</div>
 	);

@@ -16,6 +16,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -48,6 +49,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 // Exports used across app
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Analytics (only works in browser, not in API routes)
 if (typeof window !== 'undefined') {

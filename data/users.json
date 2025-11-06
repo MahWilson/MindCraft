@@ -1,0 +1,16 @@
+[
+  {
+    "id": "50976ce4-dca2-495d-b1e5-55fdad7157a7",
+    "name": "student1",
+    "email": "student1@gmail.com",
+    "role": "student",
+    "createdAt": "2025-11-04T17:15:53.304Z"
+  },
+  {
+    "id": "29c13350-077c-4ba1-985c-f4087013c07b",
+    "name": "teach1",
+    "email": "teach1@gmail.com",
+    "role": "teacher",
+    "createdAt": "2025-11-04T17:17:10.708Z"
+  }
+]

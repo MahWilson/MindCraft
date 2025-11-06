@@ -18,9 +18,13 @@
 
 ## Security Rules Reference
 
-Current Firestore Security Rules enforce:
+**⚠️ IMPORTANT:** Make sure you have proper security rules configured! See **[FIRESTORE_SECURITY_RULES.md](./FIRESTORE_SECURITY_RULES.md)** for the complete rules.
+
+Current Firestore Security Rules should enforce:
 - Users: Read own profile, admins can update/delete any
 - Courses: Read published (all), read drafts (admin/teacher), create (admin/teacher), update/delete (owner or admin)
+- Modules/Lessons: Teachers and admins can manage, students can read from published courses
+- Enrollments: Students can create their own, teachers/admins can read all
 
 ## 👥 Adding Team Members to Firebase Project
 

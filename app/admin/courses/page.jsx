@@ -6,6 +6,8 @@ import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db } from '@/firebase';
 import CourseManagement from './CourseManagement';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function AdminCoursesPage() {
 	const [draftCourses, setDraftCourses] = useState([]);
@@ -133,32 +135,51 @@ export default function AdminCoursesPage() {
 
 	if (role !== 'admin' && role !== 'teacher') {
 		return (
-			<div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
-				Unauthorized: Admin or Teacher access required
-			</div>
+			<Card className="border-error bg-error/5">
+				<CardContent className="pt-6">
+					<p className="text-body text-error">Unauthorized: Admin or Teacher access required</p>
+				</CardContent>
+			</Card>
 		);
 	}
 
 	if (loading) {
-		return <div className="p-4">Loading courses...</div>;
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<p className="text-body text-muted-foreground">Loading courses...</p>
+			</div>
+		);
 	}
 
 	return (
-		<div>
-			<div className="flex items-center justify-between mb-6">
-				<h1 className="text-2xl font-bold">Manage Courses</h1>
-				<a href="/dashboard/courses/new" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-					Create Course
+		<div className="space-y-8">
+			{/* Page Header */}
+			<div className="flex items-center justify-between">
+				<div>
+					<h1 className="text-h1 text-neutralDark mb-2">Manage Courses</h1>
+					<p className="text-body text-muted-foreground">Create, edit, and manage your courses</p>
+				</div>
+				<a href="/dashboard/courses/new">
+					<Button size="lg">Create Course</Button>
 				</a>
 			</div>
 
 			{/* Draft Courses */}
-			<div className="mb-8">
-				<h2 className="text-xl font-semibold mb-4">Draft Courses ({draftCourses.length})</h2>
+			<div>
+				<div className="flex items-center justify-between mb-6">
+					<h2 className="text-h2 text-neutralDark">Draft Courses</h2>
+					<span className="px-3 py-1 rounded-full bg-warning/10 text-warning text-caption font-medium">
+						{draftCourses.length} {draftCourses.length === 1 ? 'draft' : 'drafts'}
+					</span>
+				</div>
 				{draftCourses.length === 0 ? (
-					<p className="text-gray-500 text-sm">No draft courses</p>
+					<Card>
+						<CardContent className="pt-6">
+							<p className="text-body text-muted-foreground text-center py-8">No draft courses yet</p>
+						</CardContent>
+					</Card>
 				) : (
-					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 						{draftCourses.map((course) => (
 							<CourseManagement key={course.id} course={course} currentUserId={userId} currentRole={role} />
 						))}
@@ -168,11 +189,20 @@ export default function AdminCoursesPage() {
 
 			{/* Published Courses */}
 			<div>
-				<h2 className="text-xl font-semibold mb-4">Published Courses ({publishedCourses.length})</h2>
+				<div className="flex items-center justify-between mb-6">
+					<h2 className="text-h2 text-neutralDark">Published Courses</h2>
+					<span className="px-3 py-1 rounded-full bg-success/10 text-success text-caption font-medium">
+						{publishedCourses.length} {publishedCourses.length === 1 ? 'course' : 'courses'}
+					</span>
+				</div>
 				{publishedCourses.length === 0 ? (
-					<p className="text-gray-500 text-sm">No published courses</p>
+					<Card>
+						<CardContent className="pt-6">
+							<p className="text-body text-muted-foreground text-center py-8">No published courses yet</p>
+						</CardContent>
+					</Card>
 				) : (
-					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 						{publishedCourses.map((course) => (
 							<CourseManagement key={course.id} course={course} currentUserId={userId} currentRole={role} />
 						))}
