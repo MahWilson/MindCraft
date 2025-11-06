@@ -344,6 +344,7 @@ function CreateUserForm({ onClose, onSuccess }) {
 		fullName: '',
 		email: '',
 		username: '',
+		password: '',
 		role: 'student'
 	});
 	const [submitting, setSubmitting] = useState(false);
@@ -525,6 +526,44 @@ function CreateUserForm({ onClose, onSuccess }) {
 									e.target.style.boxShadow = 'none';
 								}}
 								placeholder="Enter username"
+							/>
+						</div>
+
+						<div style={{ marginBottom: '16px' }}>
+							<label style={{ 
+								display: 'block', 
+								marginBottom: '6px',
+								fontSize: '13px',
+								fontWeight: '500',
+								color: '#374151'
+							}}>
+								Password
+							</label>
+							<input
+								type="password"
+								required
+								value={formData.password}
+								onChange={(e) => setFormData({...formData, password: e.target.value})}
+								style={{ 
+									width: '100%', 
+									padding: '12px 14px', 
+									border: '1px solid #d1d5db', 
+									borderRadius: '8px',
+									fontSize: '14px',
+									outline: 'none',
+									transition: 'all 0.2s ease',
+									backgroundColor: 'white',
+									boxSizing: 'border-box'
+								}}
+								onFocus={(e) => {
+									e.target.style.borderColor = '#3b82f6';
+									e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+								}}
+								onBlur={(e) => {
+									e.target.style.borderColor = '#d1d5db';
+									e.target.style.boxShadow = 'none';
+								}}
+								placeholder="Enter password"
 							/>
 						</div>
 

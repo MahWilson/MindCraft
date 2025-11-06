@@ -9,10 +9,10 @@ import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'fire
 export async function POST(request) {
 	try {
 		const body = await request.json();
-		const { fullName, email, username, role } = body;
+		const { fullName, email, username, role, password } = body;
 
 		// Basic validation
-		if (!fullName || !email || !username || !role) {
+		if (!fullName || !email || !username || !role || !password) {
 			return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
 		}
 
@@ -39,6 +39,7 @@ export async function POST(request) {
 			name: fullName,
 			email,
 			username,
+			password,
 			role,
 			profilePic: '',
 			class: '',
