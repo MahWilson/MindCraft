@@ -1,35 +1,42 @@
 "use client";
 import { useState } from "react";
 
-export default function UploadProfilePicture({ userId }) {
+export default function UploadProfilePicture() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
-  const [message, setMessage] = useState("");
 
-  const handleUpload = async () => {
-    if (!file) return setMessage("Please choose a file first.");
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("userId", userId);
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected) {
+      setFile(selected);
+      setPreview(URL.createObjectURL(selected));
+    }
+  };
 
-    const res = await fetch("/api/uploadProfilePicture", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    setMessage(data.success ? "Upload successful!" : data.error);
-    if (data.url) setPreview(data.url);
+  const handleUpload = () => {
+    alert("Profile picture uploaded (demo only)");
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 bg-gray-900 text-white rounded-xl">
-      <h2 className="text-xl font-bold mb-4">Upload Profile Picture</h2>
-      <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} />
-      <button className="bg-green-600 w-full py-2 mt-2 rounded" onClick={handleUpload}>
-        Upload
-      </button>
-      {message && <p className="mt-3 text-center">{message}</p>}
-      {preview && <img src={preview} alt="Profile" className="mt-3 w-32 h-32 rounded-full mx-auto" />}
+    <div className="container">
+      <h1>Upload Profile Picture</h1>
+      {preview && (
+        <img
+          src={preview}
+          alt="Preview"
+          style={{
+            width: "120px",
+            height: "120px",
+            borderRadius: "50%",
+            objectFit: "cover",
+            margin: "12px auto",
+            display: "block",
+            border: "3px solid #2563eb",
+          }}
+        />
+      )}
+      <input type="file" accept="image/*" onChange={handleFileChange} />
+      <button onClick={handleUpload}>Upload</button>
     </div>
   );
 }
