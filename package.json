@@ -9,13 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "firebase": "^10.0.0"
+    "firebase": "^10.0.0",
+    "next": "^14.2.33",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.21",
     "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^14.0.0",
+    "postcss": "^8.5.6"
   }
 }

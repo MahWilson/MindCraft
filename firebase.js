@@ -36,4 +36,5 @@ export const db = getFirestore(app);
 // TODO(security): Enforce RBAC via Firestore Security Rules.
 // TODO(env): Ensure .env.local is populated; never commit real keys.
 
+console.log("✅ Connected to Firebase Project:", firebaseConfig.projectId);
 
