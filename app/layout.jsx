@@ -21,6 +21,7 @@ function getNavItems(role) {
 			{ href: '/admin/users', label: 'Manage Users' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
 			{ href: '/dashboard/modules', label: 'Module Library' },
+			{ href: '/dashboard/assessments', label: 'Assessments' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
 		];
@@ -31,7 +32,7 @@ function getNavItems(role) {
 			{ href: '/admin/courses', label: 'Manage Courses' },
 			{ href: '/dashboard/modules', label: 'Module Library' },
 			{ href: '/profile', label: 'Profile' },
-			{ href: '/assessments', label: 'Assessments' },
+			{ href: '/dashboard/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Grade Assignments' },
 			{ href: '/analytics', label: 'Analytics' },
 		];

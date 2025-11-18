@@ -86,6 +86,28 @@ export default function TeacherDashboard() {
 						<CardHeader>
 							<Flex justifyContent="start" className="gap-3">
 								<div className="p-2 bg-primary/10 rounded-lg">
+									<ClipboardCheck className="h-6 w-6 text-primary" />
+								</div>
+								<div>
+									<CardTitle>Create Assessment</CardTitle>
+									<CardDescription>Build quiz or test</CardDescription>
+								</div>
+							</Flex>
+						</CardHeader>
+						<CardContent>
+							<Link href="/dashboard/assessments/new">
+								<Button variant="ghost" className="w-full justify-between group">
+									Create
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
+						</CardContent>
+					</Card>
+
+					<Card className="card-hover">
+						<CardHeader>
+							<Flex justifyContent="start" className="gap-3">
+								<div className="p-2 bg-primary/10 rounded-lg">
 									<BookOpen className="h-6 w-6 text-primary" />
 								</div>
 								<div>
@@ -96,6 +118,28 @@ export default function TeacherDashboard() {
 						</CardHeader>
 						<CardContent>
 							<Link href="/admin/courses">
+								<Button variant="ghost" className="w-full justify-between group">
+									View All
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
+						</CardContent>
+					</Card>
+
+					<Card className="card-hover">
+						<CardHeader>
+							<Flex justifyContent="start" className="gap-3">
+								<div className="p-2 bg-primary/10 rounded-lg">
+									<ClipboardCheck className="h-6 w-6 text-primary" />
+								</div>
+								<div>
+									<CardTitle>Manage Assessments</CardTitle>
+									<CardDescription>View and edit assessments</CardDescription>
+								</div>
+							</Flex>
+						</CardHeader>
+						<CardContent>
+							<Link href="/dashboard/assessments">
 								<Button variant="ghost" className="w-full justify-between group">
 									View All
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
@@ -123,25 +167,6 @@ export default function TeacherDashboard() {
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
 								</Button>
 							</Link>
-						</CardContent>
-					</Card>
-
-					<Card className="card-hover">
-						<CardHeader>
-							<Flex justifyContent="start" className="gap-3">
-								<div className="p-2 bg-secondary/10 rounded-lg">
-									<Brain className="h-6 w-6 text-secondary" />
-								</div>
-								<div>
-									<CardTitle>AI Assist</CardTitle>
-									<CardDescription>Generate content</CardDescription>
-								</div>
-							</Flex>
-						</CardHeader>
-						<CardContent>
-							<Button variant="ghost" className="w-full" disabled>
-								Coming Soon
-							</Button>
 						</CardContent>
 					</Card>
 				</div>

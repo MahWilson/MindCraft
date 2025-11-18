@@ -65,12 +65,20 @@ export default function LoginPage() {
 			}
 		} catch (err) {
 			// Firebase Auth errors
-			if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-				setError('Invalid email or password');
+			console.error('Login error:', err.code, err.message);
+			
+			if (err.code === 'auth/user-not-found') {
+				setError('No account found with this email. Please register first or contact an admin.');
+			} else if (err.code === 'auth/wrong-password') {
+				setError('Incorrect password. Please try again.');
+			} else if (err.code === 'auth/invalid-credential') {
+				setError('Invalid email or password. Please check your credentials and try again.');
 			} else if (err.code === 'auth/invalid-email') {
-				setError('Invalid email format');
+				setError('Invalid email format. Please enter a valid email address.');
+			} else if (err.code === 'auth/too-many-requests') {
+				setError('Too many failed login attempts. Please try again later.');
 			} else {
-				setError(err.message || 'Login failed');
+				setError(err.message || 'Login failed. Please try again.');
 			}
 		} finally {
 			setLoading(false);

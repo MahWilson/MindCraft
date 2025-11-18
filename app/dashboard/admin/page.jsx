@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { UserPlus, BookOpen, BarChart3, ArrowRight, Users, FileText } from 'lucide-react';
+import { UserPlus, BookOpen, BarChart3, ArrowRight, Users, FileText, ClipboardCheck } from 'lucide-react';
 import { Metric, Title, Flex, Text } from '@tremor/react';
 
 export default function AdminDashboard() {
@@ -99,6 +99,28 @@ export default function AdminDashboard() {
 							<Link href="/admin/courses">
 								<Button variant="ghost" className="w-full justify-between group">
 									View Courses
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
+						</CardContent>
+					</Card>
+
+					<Card className="card-hover">
+						<CardHeader>
+							<Flex justifyContent="start" className="gap-3">
+								<div className="p-2 bg-primary/10 rounded-lg">
+									<ClipboardCheck className="h-6 w-6 text-primary" />
+								</div>
+								<div>
+									<CardTitle>Assessments</CardTitle>
+									<CardDescription>Manage all assessments</CardDescription>
+								</div>
+							</Flex>
+						</CardHeader>
+						<CardContent>
+							<Link href="/dashboard/assessments">
+								<Button variant="ghost" className="w-full justify-between group">
+									View All
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
 								</Button>
 							</Link>
