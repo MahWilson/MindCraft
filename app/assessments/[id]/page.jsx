@@ -16,20 +16,23 @@ export default function AssessmentAttemptPage({ params }) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [userRole, setUserRole] = useState(null);
+	const [userId, setUserId] = useState(null);
 	const [answers, setAnswers] = useState({});
 	const [submitting, setSubmitting] = useState(false);
 	const [submitted, setSubmitted] = useState(false);
+	const [availabilityStatus, setAvailabilityStatus] = useState(null);
 	const router = useRouter();
 	const assessmentId = params.id;
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
+				setUserId(user.uid);
 				const userDoc = await getDoc(doc(db, 'users', user.uid));
 				if (userDoc.exists()) {
 					const role = userDoc.data().role;
 					setUserRole(role);
-					await loadAssessment(role);
+					await loadAssessment(role, user.uid);
 				}
 			} else {
 				router.push('/login');
@@ -38,7 +41,7 @@ export default function AssessmentAttemptPage({ params }) {
 		return () => unsubscribe();
 	}, [assessmentId, router]);
 
-	async function loadAssessment(role) {
+	async function loadAssessment(role, currentUserId) {
 		try {
 			setLoading(true);
 			const response = await fetch(`/api/assessments/${assessmentId}`);
@@ -57,11 +60,36 @@ export default function AssessmentAttemptPage({ params }) {
 			}
 
 			setAssessment(assessmentData);
+
+			// Check availability for students
+			if (role === 'student') {
+				await checkAvailability(currentUserId);
+			}
 		} catch (err) {
 			console.error('Error loading assessment:', err);
 			setError(err.message || 'Failed to load assessment');
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	async function checkAvailability(currentUserId) {
+		try {
+			const response = await fetch(`/api/assessments/${assessmentId}/check-availability`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userId: currentUserId }),
+			});
+
+			const data = await response.json();
+			setAvailabilityStatus(data);
+
+			if (!data.available) {
+				setError(data.reason || 'Assessment is not available');
+			}
+		} catch (err) {
+			console.error('Error checking availability:', err);
+			// Continue even if check fails
 		}
 	}
 
@@ -74,6 +102,15 @@ export default function AssessmentAttemptPage({ params }) {
 
 	async function handleSubmit(e) {
 		e.preventDefault();
+
+		// Re-check availability before submission
+		if (userId) {
+			await checkAvailability(userId);
+			if (availabilityStatus && !availabilityStatus.available) {
+				setError(availabilityStatus.reason || 'Assessment is no longer available');
+				return;
+			}
+		}
 		
 		// Validate all questions are answered
 		const unansweredQuestions = assessment.questions.filter(

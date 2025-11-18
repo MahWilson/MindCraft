@@ -21,17 +21,27 @@ export default function StudentAssessmentsPage() {
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
-				if (userDoc.exists()) {
-					const role = userDoc.data().role;
-					setUserRole(role);
-					
-					// Redirect based on role
-					if (role === 'teacher' || role === 'admin') {
-						router.push('/dashboard/assessments');
-						return;
+				try {
+					const userDoc = await getDoc(doc(db, 'users', user.uid));
+					if (userDoc.exists()) {
+						const role = userDoc.data().role;
+						setUserRole(role);
+						
+						// Redirect based on role
+						if (role === 'teacher' || role === 'admin') {
+							router.push('/dashboard/assessments');
+							return;
+						}
+						await loadAssessments();
+					} else {
+						// No user doc found in Firestore — assume this is a valid student session
+						setUserRole('student');
+						await loadAssessments();
 					}
-
+				} catch (err) {
+					console.error('Error checking user doc for assessments page:', err);
+					// Fallback: treat as student and attempt to load assessments
+					setUserRole('student');
 					await loadAssessments();
 				}
 			} else {

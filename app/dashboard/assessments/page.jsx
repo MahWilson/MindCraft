@@ -8,7 +8,7 @@ import { doc, getDoc, collection, getDocs, query, where, orderBy, deleteDoc, upd
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, ClipboardCheck, Edit, Trash2, Eye, Calendar } from 'lucide-react';
+import { Plus, Search, ClipboardCheck, Edit, Trash2, Eye, Calendar, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AssessmentsPage() {
@@ -332,6 +332,16 @@ export default function AssessmentsPage() {
 									</div>
 
 									<div className="flex items-center gap-2 ml-4">
+										<Link href={`/assessments/configure/${assessment.id}`}>
+											<Button 
+												variant="ghost" 
+												size="default" 
+												title="Configure"
+												className="text-primary hover:bg-primary/10"
+											>
+												<Settings className="h-5 w-5" />
+											</Button>
+										</Link>
 										<Button
 											variant="ghost"
 											size="default"

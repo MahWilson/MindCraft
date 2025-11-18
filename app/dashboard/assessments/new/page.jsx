@@ -36,7 +36,6 @@ export default function NewAssessmentPage() {
 	const router = useRouter();
 
 	useEffect(() => {
-		// Get user role and courses on mount
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
 				const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -44,13 +43,11 @@ export default function NewAssessmentPage() {
 					const role = userDoc.data().role;
 					setUserRole(role);
 					
-					// Only teachers and admins can create assessments
 					if (role !== 'teacher' && role !== 'admin') {
 						router.push('/dashboard/student');
 						return;
 					}
 
-					// Load courses
 					await loadCourses(user.uid, role);
 				}
 			} else {
@@ -65,7 +62,6 @@ export default function NewAssessmentPage() {
 			setLoadingCourses(true);
 			let q = collection(db, 'courses');
 			
-			// Teachers see only their courses, admins see all
 			if (role === 'teacher') {
 				q = query(q, where('createdBy', '==', userId));
 			}
@@ -102,7 +98,6 @@ export default function NewAssessmentPage() {
 			return false;
 		}
 
-		// Validate each question
 		for (let i = 0; i < questions.length; i++) {
 			const q = questions[i];
 			if (!q.question || !q.question.trim()) {
@@ -141,7 +136,6 @@ export default function NewAssessmentPage() {
 		}
 
 		try {
-			// Validate required fields
 			if (!title.trim()) {
 				throw new Error('Assessment title is required');
 			}
@@ -164,10 +158,8 @@ export default function NewAssessmentPage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			// Write directly to Firestore (has auth context)
 			const docRef = await addDoc(collection(db, 'assessments'), assessmentData);
 			
-			// Store the assessment ID
 			const assessmentId = docRef.id;
 			console.log('Assessment created with ID:', assessmentId);
 
@@ -177,14 +169,12 @@ export default function NewAssessmentPage() {
 					: `Assessment "${title}" saved as draft.`
 			);
 
-			// Clear form
 			setTitle('');
 			setDescription('');
 			setCourseId('');
 			setQuestions([]);
 			setPublished(false);
 
-			// Redirect to assessments page (shorter delay for better UX)
 			setTimeout(() => {
 				router.push('/dashboard/assessments');
 			}, 1500);
