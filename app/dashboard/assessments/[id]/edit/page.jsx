@@ -321,9 +321,7 @@ export default function EditAssessmentPage({ params }) {
 				{/* Assessment Builder Component */}
 				<AssessmentBuilder
 					questions={questions}
-					setQuestions={setQuestions}
-					config={config}
-					setConfig={setConfig}
+					onQuestionsChange={setQuestions}
 				/>
 
 				{/* Actions */}
