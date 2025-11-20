@@ -2,34 +2,23 @@
 
 AI-assisted learning platform for secondary school programming education.
 
-## 🚀 Quick Start
+Development Team Members:
+Mah Wilson A23CS0243 (Team Leader)
 
-### For Team Members
+Tan Jian Ming A23CS0275 (Scrum Master)
 
-See **[docs/TEAM_SETUP.md](./docs/TEAM_SETUP.md)** for complete setup instructions.
+Mahmoud Elganzory A23CS0291 (Developer 1)
 
-**Quick steps:**
-1. Clone the repo: `git clone https://github.com/MahWilson/MindCraft.git`
-2. Install dependencies: `npm install`
-3. Get `.env` file from team lead (via secure channel)
-4. Copy `.env` to project root
-5. Run: `npm run dev`
+Khan Fadi Dawarh A23CS4013 (Developer 2)
 
-### For New Developers
+Liow Jia Feng A23CS0302 (Developer 3)
 
-1. Read [docs/TEAM_SETUP.md](./docs/TEAM_SETUP.md)
-2. Read [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md)
-3. Read [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+Mohamed Omar Makhlouf A23CS4014 (Tester 1)
 
-## 📚 Documentation
+Fam Qai Zen A23CS0223 (Tester 2)
 
-- **[TEAM_SETUP.md](./docs/TEAM_SETUP.md)** - Getting started guide
-- **[FIREBASE_SETUP.md](./docs/FIREBASE_SETUP.md)** - Firebase configuration
-- **[CONTRIBUTING.md](./docs/CONTRIBUTING.md)** - Development guidelines
-- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System architecture
-- **[MIGRATION_GUIDE.md](./docs/MIGRATION_GUIDE.md)** - Data migration guide
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 - **Frontend**: Next.js 14 (App Router), React, TailwindCSS
 - **Backend**: Next.js API Routes
@@ -37,32 +26,22 @@ See **[docs/TEAM_SETUP.md](./docs/TEAM_SETUP.md)** for complete setup instructio
 - **Authentication**: Firebase Auth
 - **Hosting**: Firebase Hosting (planned)
 
-## 📝 Environment Variables
-
-Create a `.env` file in the project root with Firebase configuration. See `.env.example` for template.
-
-**⚠️ Important:** Never commit `.env` file to Git! It's in `.gitignore`.
-
-## 🔐 Getting Firebase Credentials
-
-Contact the team lead to receive the `.env` file or Firebase project access.
-
-## 📦 Project Status
-
-✅ **Completed:**
+#
+ **Completed:**
 - Firebase Auth integration
 - Firestore database setup
 - Course management (CRUD)
 - Role-based access control
 - User registration
-
-🚧 **In Progress:**
 - Course modules/lessons
 - Assessments
-- Student submissions
 
-📋 **Planned:**
+ **In Progress:**
+
+- Student submissions
+ **Planned:**
 - AI features (Gemini API)
 - Progress tracking
 - Discussion forum
 - Offline support
+
