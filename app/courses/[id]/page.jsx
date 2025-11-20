@@ -66,26 +66,78 @@ export default function CourseDetailPage() {
 				const courseData = { id: courseDoc.id, ...courseDoc.data() };
 				setCourse(courseData);
 
-				// Load modules if they exist
+				// Load modules if they exist - fetch directly from Firestore (client-side with auth)
 				if (courseData.modules && courseData.modules.length > 0) {
-					const modulesResponse = await fetch(`/api/modules?courseId=${courseId}`);
-					const modulesData = await modulesResponse.json();
-					
-					if (modulesData.modules) {
-						setModules(modulesData.modules);
+					try {
+						// Fetch modules directly from Firestore
+						const { getDoc } = await import('firebase/firestore');
+						const loadedModules = [];
+						
+						for (const moduleId of courseData.modules) {
+							try {
+								const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+								if (moduleDoc.exists()) {
+									loadedModules.push({
+										id: moduleDoc.id,
+										...moduleDoc.data(),
+									});
+								}
+							} catch (moduleErr) {
+								console.error(`Error loading module ${moduleId}:`, moduleErr);
+							}
+						}
+						
+						// Sort by order
+						loadedModules.sort((a, b) => (a.order || 0) - (b.order || 0));
+						setModules(loadedModules);
 						
 						// Load lessons for each module
 						const lessonsMap = {};
-						for (const module of modulesData.modules) {
+						for (const module of loadedModules) {
 							if (module.lessons && module.lessons.length > 0) {
-								const lessonsResponse = await fetch(`/api/lessons?moduleId=${module.id}`);
-								const lessonsData = await lessonsResponse.json();
-								if (lessonsData.lessons) {
-									lessonsMap[module.id] = lessonsData.lessons;
+								try {
+									const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore');
+									const lessonsQuery = query(
+										collection(db, 'lessons'),
+										where('moduleId', '==', module.id),
+										orderBy('order', 'asc')
+									);
+									const lessonsSnapshot = await getDocs(lessonsQuery);
+									const loadedLessons = lessonsSnapshot.docs.map(doc => ({
+										id: doc.id,
+										...doc.data(),
+									}));
+									lessonsMap[module.id] = loadedLessons;
+								} catch (lessonErr) {
+									console.error(`Error loading lessons for module ${module.id}:`, lessonErr);
+									// Fallback: try to load from module.lessons array
+									if (module.lessons && module.lessons.length > 0) {
+										const { getDoc } = await import('firebase/firestore');
+										const fallbackLessons = [];
+										for (const lessonId of module.lessons) {
+											try {
+												const lessonDoc = await getDoc(doc(db, 'lessons', lessonId));
+												if (lessonDoc.exists()) {
+													fallbackLessons.push({
+														id: lessonDoc.id,
+														...lessonDoc.data(),
+													});
+												}
+											} catch (err) {
+												console.error(`Error loading lesson ${lessonId}:`, err);
+											}
+										}
+										fallbackLessons.sort((a, b) => (a.order || 0) - (b.order || 0));
+										lessonsMap[module.id] = fallbackLessons;
+									}
 								}
 							}
 						}
 						setLessons(lessonsMap);
+					} catch (err) {
+						console.error('Error loading modules:', err);
+						// Set empty modules array so it shows the empty state
+						setModules([]);
 					}
 				}
 			} catch (err) {

@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, ChevronDown, ChevronUp, ExternalLink, BookOpen, Search } from 'lucide-react';
 import Link from 'next/link';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '@/firebase';
 
 export default function CourseModuleManager({ courseId, initialModules = [], onModulesChange }) {
 	const [modules, setModules] = useState([]);
@@ -31,35 +33,68 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 		
 		setLoading(true);
 		try {
-			const response = await fetch(`/api/modules?courseId=${courseId}`);
-			const data = await response.json();
+			// Load course to get module IDs
+			const courseDoc = await getDoc(doc(db, 'courses', courseId));
+			if (!courseDoc.exists()) {
+				setLoading(false);
+				return;
+			}
+
+			const courseData = courseDoc.data();
+			const moduleIds = courseData.modules || [];
 			
-			if (data.modules) {
-				// Load lesson counts for each module
-				const modulesWithLessonCounts = await Promise.all(
-					data.modules.map(async (module) => {
+			if (moduleIds.length === 0) {
+				setModules([]);
+				setLoading(false);
+				return;
+			}
+
+			// Load modules directly from Firestore (client-side with auth)
+			const loadedModules = [];
+			for (const moduleId of moduleIds) {
+				try {
+					const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+					if (moduleDoc.exists()) {
+						const moduleData = {
+							id: moduleDoc.id,
+							...moduleDoc.data(),
+						};
+						
+						// Load lesson count
 						let lessonCount = 0;
-						if (module.lessons && module.lessons.length > 0) {
+						if (moduleData.lessons && moduleData.lessons.length > 0) {
+							// Try to get lessons count from Firestore query
 							try {
-								const lessonsResponse = await fetch(`/api/lessons?moduleId=${module.id}`);
-								const lessonsData = await lessonsResponse.json();
-								lessonCount = lessonsData.lessons?.length || 0;
-							} catch (err) {
-								console.error('Error loading lessons for module:', err);
+								const { collection, query, where, getDocs } = await import('firebase/firestore');
+								const lessonsQuery = query(
+									collection(db, 'lessons'),
+									where('moduleId', '==', moduleId)
+								);
+								const lessonsSnapshot = await getDocs(lessonsQuery);
+								lessonCount = lessonsSnapshot.size;
+							} catch (lessonErr) {
+								// Fallback: use length of lessons array
+								lessonCount = moduleData.lessons.length;
 							}
 						}
-						return {
-							...module,
+						
+						loadedModules.push({
+							...moduleData,
 							lessonCount,
-						};
-					})
-				);
-				setModules(modulesWithLessonCounts);
-				
-				// Auto-expand first module if there are modules
-				if (modulesWithLessonCounts.length > 0 && Object.keys(expandedModules).length === 0) {
-					setExpandedModules({ [modulesWithLessonCounts[0].id]: true });
+						});
+					}
+				} catch (moduleErr) {
+					console.error(`Error loading module ${moduleId}:`, moduleErr);
 				}
+			}
+			
+			// Sort by order
+			loadedModules.sort((a, b) => (a.order || 0) - (b.order || 0));
+			setModules(loadedModules);
+			
+			// Auto-expand first module if there are modules
+			if (loadedModules.length > 0 && Object.keys(expandedModules).length === 0) {
+				setExpandedModules({ [loadedModules[0].id]: true });
 			}
 		} catch (err) {
 			console.error('Error loading modules:', err);
@@ -114,19 +149,38 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 		setLoading(true);
 		try {
 			if (courseId) {
-				// Create module and link to course
-				const response = await fetch('/api/modules', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						title: newModuleTitle.trim(),
-						order: modules.length,
-						courseId, // Link to course
-					}),
-				});
+				// Create module directly in Firestore (client-side with Firebase Auth)
+				// Check authentication
+				if (!auth.currentUser) {
+					throw new Error('You must be signed in to create a module');
+				}
 
-				const data = await response.json();
-				if (!response.ok) throw new Error(data.error);
+				// Create module in Firestore
+				const moduleData = {
+					title: newModuleTitle.trim(),
+					order: modules.length,
+					lessons: [],
+					createdBy: auth.currentUser.uid, // Track module owner
+					collaborators: [], // Reserved for future collaboration features
+					createdAt: serverTimestamp(),
+					updatedAt: serverTimestamp(),
+				};
+
+				const moduleRef = await addDoc(collection(db, 'modules'), moduleData);
+
+				// Link module to course
+				const courseRef = doc(db, 'courses', courseId);
+				const courseDoc = await getDoc(courseRef);
+
+				if (courseDoc.exists()) {
+					const courseModules = courseDoc.data().modules || [];
+					if (!courseModules.includes(moduleRef.id)) {
+						await updateDoc(courseRef, {
+							modules: [...courseModules, moduleRef.id],
+							updatedAt: serverTimestamp(),
+						});
+					}
+				}
 
 				// Reload modules to show the new one
 				await loadModules();
@@ -260,13 +314,22 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 						}
 					}}
 				/>
-				<Button onClick={addModule} disabled={loading || !newModuleTitle.trim()}>
-					<Plus className="h-4 w-4 mr-2" />
+				<Button 
+					onClick={addModule} 
+					disabled={loading || !newModuleTitle.trim()}
+					title="Create a new module for this course"
+				>
+					<Plus className="h-5 w-5 mr-2" />
 					Add New Module
 				</Button>
 				{courseId && (
-					<Button onClick={toggleModuleLibrary} variant="outline" disabled={loading}>
-						<Search className="h-4 w-4 mr-2" />
+					<Button 
+						onClick={toggleModuleLibrary} 
+						variant="outline" 
+						disabled={loading}
+						title="Browse and add existing modules from the module library"
+					>
+						<Search className="h-5 w-5 mr-2" />
 						{showModuleLibrary ? 'Hide' : 'Browse'} Library
 					</Button>
 				)}
@@ -307,14 +370,19 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 										</div>
 										<div className="flex items-center gap-2">
 											<Link href={`/dashboard/modules/${module.id}`}>
-												<Button variant="ghost" size="sm">
-													<ExternalLink className="h-4 w-4" />
+												<Button 
+													variant="ghost" 
+													size="sm"
+													title="Open module to manage lessons"
+												>
+													<ExternalLink className="h-5 w-5" />
 												</Button>
 											</Link>
 											<Button
 												size="sm"
 												onClick={() => addExistingModule(module.id)}
 												disabled={loading}
+												title="Add this module to the course"
 											>
 												Add
 											</Button>
@@ -346,19 +414,26 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 								</div>
 								<div className="flex items-center gap-2">
 									<Link href={`/dashboard/modules/${module.id}`}>
-										<Button variant="ghost" size="sm">
-											<ExternalLink className="h-4 w-4 mr-2" />
+										<Button 
+											variant="outline"
+											size="sm"
+											className="border-primary/20 hover:bg-primary/10 hover:border-primary/40"
+											title="Open module to add and manage lessons"
+										>
+											<ExternalLink className="h-5 w-5 mr-2 text-primary" />
 											Manage Lessons
 										</Button>
 									</Link>
 									<Button
-										variant="ghost"
+										variant="outline"
 										size="sm"
 										onClick={() => removeModule(module.id)}
-										className="text-error hover:text-error"
+										className="border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40 text-destructive hover:text-destructive"
 										disabled={loading}
+										title="Remove this module from the course (module will not be deleted)"
 									>
-										<Trash2 className="h-4 w-4" />
+										<Trash2 className="h-5 w-5 mr-2 fill-destructive text-destructive" />
+										Delete
 									</Button>
 								</div>
 							</div>

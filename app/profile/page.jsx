@@ -171,6 +171,32 @@ export default function ProfilePage() {
 		}
 	};
 
+	const handleRemoveProfilePicture = async () => {
+		if (!confirm('Are you sure you want to remove your profile picture?')) {
+			return;
+		}
+
+		setError('');
+		setSuccess('');
+
+		try {
+			// Update Firestore to remove profile picture
+			await updateDoc(doc(db, 'users', user.uid), {
+				profilePicture: '',
+			});
+
+			// Update local state
+			setProfilePictureUrl('');
+			setProfilePicture(null);
+			setUserData({ ...userData, profilePicture: '' });
+			setSuccess('Profile picture removed successfully!');
+			setTimeout(() => setSuccess(''), 3000);
+		} catch (err) {
+			console.error('Error removing profile picture:', err);
+			setError('Failed to remove profile picture: ' + (err.message || 'Unknown error'));
+		}
+	};
+
 	const handleChangePassword = async () => {
 		setError('');
 		setSuccess('');
@@ -266,16 +292,16 @@ export default function ProfilePage() {
 				<CardContent className="space-y-4">
 					{/* Profile Picture */}
 					<div className="flex items-center gap-6">
-						<div className="relative">
+						<div className="relative group">
 							{profilePictureUrl ? (
 								<img
 									src={profilePictureUrl}
 									alt="Profile"
-									className="w-24 h-24 rounded-full object-cover border-2 border-border"
+									className="w-[150px] h-[150px] rounded-full object-cover border-2 border-border"
 								/>
 							) : (
-								<div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border">
-									<User className="h-12 w-12 text-primary" />
+								<div className="w-[150px] h-[150px] rounded-full bg-primary/10 flex items-center justify-center border-2 border-border">
+									<User className="h-20 w-20 text-primary" />
 								</div>
 							)}
 						</div>
@@ -293,6 +319,18 @@ export default function ProfilePage() {
 							<p className="text-caption text-muted-foreground mt-1">
 								JPG, PNG or GIF. Max size: 5MB
 							</p>
+							{profilePictureUrl && (
+								<Button
+									type="button"
+									variant="destructive"
+									onClick={handleRemoveProfilePicture}
+									disabled={uploading}
+									className="mt-2 scale-[0.7] origin-left"
+								>
+									<X className="h-3.5 w-3.5 mr-1.5" />
+									Remove Picture
+								</Button>
+							)}
 						</div>
 					</div>
 

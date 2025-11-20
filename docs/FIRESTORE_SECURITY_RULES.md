@@ -4,30 +4,41 @@
 
 The default Firebase rules allow public access to everything, which is **NOT secure**. Use the rules below instead.
 
-## Proper Security Rules
+## Current Production Rules
 
-Go to **Firebase Console → Firestore Database → Rules** and replace with:
+These are the **latest and most up-to-date** Firestore security rules. Copy and paste these into **Firebase Console → Firestore Database → Rules**:
 
 ```javascript
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to get user role
+    // Helper function to get user role (robust version)
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      // Check if user document exists and has role field
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && userDoc.data != null && 'role' in userDoc.data
+             ? userDoc.data.role
+             : null;
     }
     
     function isAdmin() {
-      return request.auth != null && getUserRole() == 'admin';
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             getUserRole() == 'admin';
     }
     
     function isTeacher() {
-      return request.auth != null && getUserRole() == 'teacher';
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             getUserRole() == 'teacher';
     }
     
     function isStudent() {
-      return request.auth != null && getUserRole() == 'student';
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             getUserRole() == 'student';
     }
     
     function isOwner(userId) {
@@ -35,9 +46,11 @@ service cloud.firestore {
     }
     
     // Users Collection
+    // IMPORTANT: This must allow reads for authenticated users FIRST
+    // so that getUserRole() can work in other rules
     match /users/{userId} {
-      // Allow any signed-in user to read users (needed for API routes)
-      // API routes handle permission checks server-side
+      // Allow any authenticated user to read users (needed for role checks)
+      // This MUST be first to allow getUserRole() to work
       allow read: if request.auth != null;
       
       // Users can update their own profile
@@ -46,23 +59,24 @@ service cloud.firestore {
       // Admins can update/delete any user (except themselves for delete)
       allow update, delete: if isAdmin() && request.auth.uid != userId;
       
-      // Allow signed-in users to create (API routes check admin role server-side)
+      // Allow authenticated users to create (API routes check admin role server-side)
       allow create: if request.auth != null;
     }
     
     // Courses Collection
     match /courses/{courseId} {
-      // Anyone can read published courses
+      // Anyone can read published courses (even without auth)
       allow read: if resource.data.status == 'published';
       
       // Authenticated users can read published courses
       allow read: if request.auth != null && resource.data.status == 'published';
       
-      // Teachers and admins can read draft courses
+      // Teachers and admins can read ALL courses (including drafts)
+      // This allows teachers to see all courses when querying the collection
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
-      // Allow signed-in users to create (API routes check teacher/admin role server-side)
-      allow create: if request.auth != null;
+      // Teachers and admins can create courses
+      allow create: if request.auth != null && (isTeacher() || isAdmin());
       
       // Course owner or admin can update/delete
       allow update, delete: if request.auth != null && (
@@ -73,9 +87,10 @@ service cloud.firestore {
     // Modules Collection
     match /modules/{moduleId} {
       // Teachers and admins can read all modules
+      // This is permissive to allow collection queries
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
-      // Students can read modules from published courses
+      // Students can read modules (we check course status in application code)
       allow read: if request.auth != null && isStudent();
       
       // Teachers and admins can create/update/delete modules
@@ -87,7 +102,7 @@ service cloud.firestore {
       // Teachers and admins can read all lessons
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
-      // Students can read lessons from published courses
+      // Students can read lessons (we check course status in application code)
       allow read: if request.auth != null && isStudent();
       
       // Teachers and admins can create/update/delete lessons
@@ -111,13 +126,27 @@ service cloud.firestore {
     
     // Assessments Collection
     match /assessments/{assessmentId} {
-      // Teachers and admins can read all assessments
+      // Teachers and admins can read all assessments (published and draft)
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
-      // Students can read published assessments
+      // Students can only read published assessments
       allow read: if request.auth != null && isStudent() && resource.data.published == true;
       
       // Teachers and admins can create/update/delete assessments
+      allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
+    }
+    
+    // Assignments Collection
+    match /assignments/{assignmentId} {
+      // Teachers and admins can read all assignments (published and draft)
+      allow read: if request.auth != null && (isTeacher() || isAdmin());
+      
+      // Students can read published and open assignments
+      allow read: if request.auth != null && isStudent() && 
+                  resource.data.status == 'published' && 
+                  resource.data.isOpen == true;
+      
+      // Teachers and admins can create/update/delete assignments
       allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
     }
     
@@ -136,6 +165,16 @@ service cloud.firestore {
       allow update: if request.auth != null && (isTeacher() || isAdmin());
     }
     
+    // Settings Collection (for app-wide settings like logo)
+    match /settings/{settingId} {
+      // All authenticated users can read settings (for logo display)
+      allow read: if request.auth != null;
+      // Only admins can create/update settings
+      allow create, update: if request.auth != null && isAdmin();
+      // Only admins can delete settings
+      allow delete: if request.auth != null && isAdmin();
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
@@ -144,44 +183,113 @@ service cloud.firestore {
 }
 ```
 
-## Important Notes
+## Quick Test Rules (If Above Doesn't Work)
 
-**About API Routes:**
-- API routes use Firebase Web SDK which requires user authentication
-- Rules allow authenticated users to read/write, but API routes perform additional permission checks server-side
-- This is a security-in-depth approach: rules provide base protection, API routes enforce business logic
+If you're still getting permission errors, try these **temporary test rules** to verify your setup. **⚠️ These are permissive and should only be used for testing:**
 
-**About Firebase Project Collaborators:**
-- People you add to your Firebase project (via Firebase Console → Project Settings → Users and permissions) have **admin access to the Firebase Console**
-- They can manage the project, view data, and configure settings through the console
-- Firestore security rules **do NOT affect** Firebase Console access - collaborators can always access via console
-- Security rules only affect **application-level access** (when your app code tries to read/write)
+```javascript
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TEMPORARY TEST RULES - Very permissive for debugging
+    // Replace with production rules above once everything works
+    
+    match /{document=**} {
+      // Allow all reads/writes for authenticated users (FOR TESTING ONLY)
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+**Use these test rules to:**
+1. Verify that authentication is working
+2. Check if the issue is with the rules or with authentication
+3. Once confirmed working, switch back to the production rules above
 
 ## How to Apply
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Select your project: `mindcraft-f14ac`
-3. Click **Firestore Database** in the left sidebar
-4. Click on the **Rules** tab
-5. Copy and paste the rules above
-6. Click **Publish**
-7. Wait a few seconds for rules to propagate
+3. Click **Firestore Database** → **Rules** tab
+4. Copy and paste the rules above (start with test rules if needed)
+5. Click **Publish**
+6. Wait 30-60 seconds for rules to propagate
 
-## Testing
+## Important Notes
 
-After applying these rules:
-- ✅ Users can read/update their own profile
-- ✅ Admins can manage all users
-- ✅ Published courses are readable by everyone
-- ✅ Draft courses are only readable by teachers/admins
-- ✅ Students can enroll in courses
-- ✅ Teachers can create/manage courses and content
+### Two Separate Rule Systems
+
+**Firestore Rules** (Database):
+- Location: Firebase Console → **Firestore Database** → Rules
+- Controls: Reading/writing documents in Firestore
+- File: `docs/FIRESTORE_SECURITY_RULES.md` (this file)
+
+**Storage Rules** (File Uploads):
+- Location: Firebase Console → **Storage** → Rules  
+- Controls: Uploading/downloading files to Firebase Storage
+- File: `docs/FIREBASE_STORAGE_SETUP.md`
+
+**These are completely separate!** Make sure you apply rules to the correct place.
+
+### Users Collection Must Allow Reads First
+
+The `users` collection rules **must** allow authenticated users to read first (line 58), because:
+- Other rules call `getUserRole()` which reads from the `users` collection
+- If users can't read their own document, `isTeacher()` and `isAdmin()` will fail
+- This creates a circular dependency issue
+
+### Database Name
+
+- The rules use `{database}` variable which works with any database name
+- Most projects use "(default)" as the database name
+- The rules will work regardless of your database name
 
 ## Troubleshooting
 
-If you get permission errors:
-1. Make sure you're logged in
-2. Verify your user document exists in Firestore with the correct `role` field
-3. Check that the user UID matches between Auth and Firestore
-4. Review the browser console for specific error messages
+### "Missing or insufficient permissions" for Modules/Courses
 
+1. **Check if you applied Firestore rules (not Storage rules)**
+   - Go to Firebase Console → **Firestore Database** → Rules (NOT Storage → Rules)
+   - Make sure the rules are published
+
+2. **Verify user document exists**
+   - Go to Firestore Database → `users` collection
+   - Find your user document (by your user ID from Firebase Auth)
+   - Make sure it has a `role` field with value `'teacher'` or `'admin'`
+
+3. **Try the test rules first**
+   - Apply the "Quick Test Rules" above
+   - If those work, the issue is with the role checking logic
+   - If those don't work, the issue is with authentication
+
+4. **Check browser console**
+   - Look for specific error messages
+   - Check if `request.auth.uid` is null (user not authenticated)
+
+### "Missing or insufficient permissions" for User Profile
+
+- The `users` collection must allow `allow read: if request.auth != null;` (line 58)
+- This is needed so the sidebar can load the user profile
+- Make sure this rule is present and published
+
+### CORS Errors for File Uploads
+
+- CORS errors are from **Firebase Storage**, not Firestore
+- Apply Storage rules from `docs/FIREBASE_STORAGE_SETUP.md`
+- Go to Firebase Console → **Storage** → Rules (NOT Firestore → Rules)
+
+## Testing Checklist
+
+After applying rules:
+- [ ] Sign in as a teacher
+- [ ] Check if you can see modules in Module Library
+- [ ] Check if you can see courses in Manage Courses
+- [ ] Check if profile picture loads in sidebar
+- [ ] Try uploading a file (should work after Storage rules are applied)
+
+## Related Documentation
+
+- **Firebase Storage Rules**: See `docs/FIREBASE_STORAGE_SETUP.md`
+- **Firebase Setup**: See `docs/FIREBASE_SETUP.md`
