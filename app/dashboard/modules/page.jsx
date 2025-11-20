@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -49,33 +49,99 @@ export default function ModulesPage() {
 	async function loadModules() {
 		setLoading(true);
 		try {
-			const response = await fetch('/api/modules');
-			const data = await response.json();
-			
-			if (data.modules) {
-				// Load lesson counts for each module
-				const modulesWithCounts = await Promise.all(
-					data.modules.map(async (module) => {
-						let lessonCount = 0;
-						if (module.lessons && module.lessons.length > 0) {
-							try {
-								const lessonsResponse = await fetch(`/api/lessons?moduleId=${module.id}`);
-								const lessonsData = await lessonsResponse.json();
-								lessonCount = lessonsData.lessons?.length || 0;
-							} catch (err) {
-								// Ignore errors
-							}
+			// Load modules directly from Firestore (client-side with Firebase Auth)
+			const modulesQuery = query(
+				collection(db, 'modules'),
+				orderBy('createdAt', 'desc')
+			);
+
+			const snapshot = await getDocs(modulesQuery);
+			const loadedModules = snapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+
+			// Load lesson counts for each module
+			const modulesWithCounts = await Promise.all(
+				loadedModules.map(async (module) => {
+					let lessonCount = 0;
+					
+					// Try to get lessons count from Firestore query
+					try {
+						const { collection, query, where, getDocs } = await import('firebase/firestore');
+						const lessonsQuery = query(
+							collection(db, 'lessons'),
+							where('moduleId', '==', module.id)
+						);
+						const lessonsSnapshot = await getDocs(lessonsQuery);
+						lessonCount = lessonsSnapshot.size;
+					} catch (lessonErr) {
+						// Fallback: use length of lessons array if it exists
+						if (module.lessons && Array.isArray(module.lessons)) {
+							lessonCount = module.lessons.length;
 						}
-						return {
-							...module,
-							lessonCount,
-						};
-					})
-				);
-				setModules(modulesWithCounts);
-			}
+					}
+					
+					return {
+						...module,
+						lessonCount,
+					};
+				})
+			);
+			
+			setModules(modulesWithCounts);
 		} catch (err) {
 			console.error('Error loading modules:', err);
+			console.error('Error details:', {
+				code: err.code,
+				message: err.message
+			});
+			// If orderBy fails, try without it
+			if (err.code === 'failed-precondition' || err.message?.includes('index')) {
+				try {
+					console.log('Retrying without orderBy...');
+					const snapshot = await getDocs(collection(db, 'modules'));
+					const loadedModules = snapshot.docs.map(doc => ({
+						id: doc.id,
+						...doc.data(),
+					}));
+					
+					// Sort by createdAt manually if available
+					loadedModules.sort((a, b) => {
+						const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+						const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+						return bTime - aTime; // Descending
+					});
+					
+					// Load lesson counts
+					const modulesWithCounts = await Promise.all(
+						loadedModules.map(async (module) => {
+							let lessonCount = 0;
+							try {
+								const { collection, query, where, getDocs } = await import('firebase/firestore');
+								const lessonsQuery = query(
+									collection(db, 'lessons'),
+									where('moduleId', '==', module.id)
+								);
+								const lessonsSnapshot = await getDocs(lessonsQuery);
+								lessonCount = lessonsSnapshot.size;
+							} catch (lessonErr) {
+								if (module.lessons && Array.isArray(module.lessons)) {
+									lessonCount = module.lessons.length;
+								}
+							}
+							return {
+								...module,
+								lessonCount,
+							};
+						})
+					);
+					
+					setModules(modulesWithCounts);
+				} catch (fallbackErr) {
+					console.error('Fallback also failed:', fallbackErr);
+				}
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -86,17 +152,23 @@ export default function ModulesPage() {
 
 		setCreating(true);
 		try {
-			const response = await fetch('/api/modules', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					title: newModuleTitle.trim(),
-					order: 0,
-				}),
-			});
+			// Check authentication
+			if (!auth.currentUser) {
+				throw new Error('You must be signed in to create a module');
+			}
 
-			const data = await response.json();
-			if (!response.ok) throw new Error(data.error);
+			// Create module directly in Firestore (client-side with Firebase Auth)
+			const moduleData = {
+				title: newModuleTitle.trim(),
+				order: 0,
+				lessons: [],
+				createdBy: auth.currentUser.uid, // Track module owner
+				collaborators: [], // Reserved for future collaboration features
+				createdAt: serverTimestamp(),
+				updatedAt: serverTimestamp(),
+			};
+
+			await addDoc(collection(db, 'modules'), moduleData);
 
 			// Reload modules
 			await loadModules();

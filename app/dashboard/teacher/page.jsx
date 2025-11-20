@@ -111,15 +111,15 @@ export default function TeacherDashboard() {
 									<ClipboardCheck className="h-6 w-6 text-secondary" />
 								</div>
 								<div>
-									<CardTitle>Grade Assignments</CardTitle>
-									<CardDescription>Review submissions</CardDescription>
+									<CardTitle>Assignments</CardTitle>
+									<CardDescription>Manage assignments</CardDescription>
 								</div>
 							</Flex>
 						</CardHeader>
 						<CardContent>
 							<Link href="/assignments">
-								<Button variant="ghost" className="w-full justify-between group">
-									Grade
+									<Button variant="ghost" className="w-full justify-between group">
+									Manage
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
 								</Button>
 							</Link>

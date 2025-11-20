@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,32 +80,61 @@ export default function NewCoursePage() {
 			if (modules && modules.length > 0) {
 				for (const module of modules) {
 					if (module.temp) {
-						// Create module in Firestore
-						const moduleResponse = await fetch('/api/modules', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({
-								courseId: newCourseId,
-								title: module.title,
-								order: module.order || 0,
-							}),
-						});
+						// Create module directly in Firestore (client-side with Firebase Auth)
+						const moduleData = {
+							title: module.title,
+							order: module.order || 0,
+							lessons: [],
+							createdAt: serverTimestamp(),
+							updatedAt: serverTimestamp(),
+						};
 
-						const moduleData = await moduleResponse.json();
-						if (moduleData.success && module.lessons && module.lessons.length > 0) {
-							// Create lessons for this module
+						const moduleRef = await addDoc(collection(db, 'modules'), moduleData);
+
+						// Link module to course
+						const courseRef = doc(db, 'courses', newCourseId);
+						const courseDoc = await getDoc(courseRef);
+						if (courseDoc.exists()) {
+							const courseModules = courseDoc.data().modules || [];
+							if (!courseModules.includes(moduleRef.id)) {
+								await updateDoc(courseRef, {
+									modules: [...courseModules, moduleRef.id],
+									updatedAt: serverTimestamp(),
+								});
+							}
+						}
+
+						// Create lessons for this module if any
+						if (module.lessons && module.lessons.length > 0) {
 							for (const lesson of module.lessons) {
 								if (lesson.temp) {
-									await fetch('/api/lessons', {
-										method: 'POST',
-										headers: { 'Content-Type': 'application/json' },
-										body: JSON.stringify({
-											moduleId: moduleData.moduleId,
-											title: lesson.title,
-											contentHtml: lesson.contentHtml || '',
-											order: lesson.order || 0,
-										}),
-									});
+									const lessonData = {
+										moduleId: moduleRef.id,
+										title: lesson.title,
+										contentHtml: lesson.contentHtml || '',
+										materials: [],
+										order: lesson.order || 0,
+										aiGenerated: false,
+										createdAt: serverTimestamp(),
+										updatedAt: serverTimestamp(),
+									};
+
+									const lessonRef = await addDoc(collection(db, 'lessons'), lessonData);
+
+									// Update module to include this lesson
+									const moduleLessons = [];
+									if (moduleRef.id) {
+										const moduleDoc = await getDoc(doc(db, 'modules', moduleRef.id));
+										if (moduleDoc.exists()) {
+											const existingLessons = moduleDoc.data().lessons || [];
+											if (!existingLessons.includes(lessonRef.id)) {
+												await updateDoc(doc(db, 'modules', moduleRef.id), {
+													lessons: [...existingLessons, lessonRef.id],
+													updatedAt: serverTimestamp(),
+												});
+											}
+										}
+									}
 								}
 							}
 						}

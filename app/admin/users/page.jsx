@@ -52,23 +52,55 @@ export default function ManageUsersPage() {
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
-			if (user) {
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
-				if (userDoc.exists()) {
-					const userRole = userDoc.data().role;
-					setRole(userRole);
-					
-					// Only admins can access
-					if (userRole !== 'admin') {
-						router.push('/dashboard/admin');
-						return;
-					}
-					
-					// Load users once role is confirmed
-					loadUsers();
-				}
-			} else {
+			if (!user) {
 				router.push('/login');
+				setLoading(false);
+				return;
+			}
+
+			try {
+				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				if (!userDoc.exists()) {
+					console.error('User document does not exist for UID:', user.uid);
+					setError('User profile not found. Please contact an administrator.');
+					setLoading(false);
+					return;
+				}
+
+				const userData = userDoc.data();
+				const userRole = userData?.role;
+				
+				console.log('User role loaded:', userRole, 'for user:', user.uid);
+				
+				if (!userRole) {
+					console.error('User document exists but role is missing:', userData);
+					setError('User role not found. Please contact an administrator.');
+					setLoading(false);
+					return;
+				}
+				
+				setRole(userRole);
+				
+				// Only admins can access
+				if (userRole !== 'admin') {
+					console.log('User is not admin, redirecting. Role:', userRole);
+					router.push('/dashboard/admin');
+					setLoading(false);
+					return;
+				}
+				
+				console.log('User is admin, loading users list...');
+				// Load users once role is confirmed
+				await loadUsers();
+			} catch (err) {
+				console.error('Error checking user role:', err);
+				console.error('Error details:', {
+					code: err.code,
+					message: err.message,
+					stack: err.stack
+				});
+				setError(`Failed to verify permissions: ${err.message || 'Unknown error'}. Please check the browser console for details.`);
+				setLoading(false);
 			}
 		});
 		return () => unsubscribe();

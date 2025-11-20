@@ -20,7 +20,9 @@ function getNavItems(role) {
 			{ href: '/admin/register', label: 'Register Users' },
 			{ href: '/admin/users', label: 'Manage Users' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
+			{ href: '/admin/settings', label: 'Settings' },
 			{ href: '/dashboard/modules', label: 'Module Library' },
+			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
 		];
@@ -32,7 +34,7 @@ function getNavItems(role) {
 			{ href: '/dashboard/modules', label: 'Module Library' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
-			{ href: '/assignments', label: 'Grade Assignments' },
+			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/analytics', label: 'Analytics' },
 		];
 	} else if (role === 'student') {

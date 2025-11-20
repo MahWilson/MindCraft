@@ -19,7 +19,8 @@ import {
 	Home,
 	Search,
 	User,
-	Users
+	Users,
+	Settings
 } from 'lucide-react';
 
 const iconMap = {
@@ -27,10 +28,11 @@ const iconMap = {
 	'Register Users': UserPlus,
 	'Manage Users': Users,
 	'Manage Courses': BookOpen,
+	'Settings': Settings,
 	'Analytics': BarChart3,
 	'Create Course': FileText,
 	'Assessments': ClipboardCheck,
-	'Grade Assignments': FileText,
+	'Assignments': FileText,
 	'My Courses': BookOpen,
 	'Progress': BarChart3,
 	'Forum': MessageSquare,
@@ -93,9 +95,19 @@ export default function Sidebar({ role, navItems }) {
 			{/* Logo/Brand */}
 			<Link 
 				href="/" 
-				className="px-6 pt-6 pb-4 text-h2 font-semibold text-neutralDark hover:opacity-80 transition-opacity duration-200"
+				className="px-6 pt-6 pb-4 flex items-center justify-center hover:opacity-80 transition-opacity duration-200"
 			>
-				MindCraft
+				<div className="flex-shrink-0 rounded-full overflow-hidden border border-border/50 shadow-sm w-28 h-28">
+					<img
+						src="/logoMindCraft.jpg"
+						alt="MindCraft Logo"
+						className="w-full h-full object-cover scale-100 -translate-y-1"
+						onError={(e) => {
+							// Hide image if logo file doesn't exist
+							e.target.style.display = 'none';
+						}}
+					/>
+				</div>
 			</Link>
 			
 			{/* Profile Picture and Role Badge */}
