@@ -24,6 +24,7 @@ function getNavItems(role) {
 			{ href: '/dashboard/assessments', label: 'Assessments' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
+			{ href: '/forum', label: 'Forum' },
 		];
 	} else if (role === 'teacher') {
 		return [
@@ -35,6 +36,7 @@ function getNavItems(role) {
 			{ href: '/dashboard/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Grade Assignments' },
 			{ href: '/analytics', label: 'Analytics' },
+			{ href: '/forum', label: 'Forum' },
 		];
 	} else if (role === 'student') {
 		return [
