@@ -59,19 +59,19 @@ export default function TeacherDashboard() {
 			{/* Action Cards */}
 			<div>
 				<h2 className="text-h2 text-neutralDark mb-6">Quick Actions</h2>
-				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-					<Card className="card-hover">
-						<CardHeader>
-							<Flex justifyContent="start" className="gap-3">
-								<div className="p-2 bg-primary/10 rounded-lg">
-									<FileText className="h-6 w-6 text-primary" />
-								</div>
-								<div>
-									<CardTitle>Create Course</CardTitle>
-									<CardDescription>Start building</CardDescription>
-								</div>
-							</Flex>
-						</CardHeader>
+			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+				<Card className="card-hover">
+					<CardHeader>
+						<Flex justifyContent="start" className="gap-3">
+							<div className="p-2 bg-primary/10 rounded-lg">
+								<FileText className="h-6 w-6 text-primary" />
+							</div>
+							<div>
+								<CardTitle>Create Course</CardTitle>
+								<CardDescription>Start building</CardDescription>
+							</div>
+						</Flex>
+					</CardHeader>
 						<CardContent>
 							<Link href="/dashboard/courses/new">
 								<Button variant="ghost" className="w-full justify-between group">
@@ -80,7 +80,8 @@ export default function TeacherDashboard() {
 								</Button>
 							</Link>
 						</CardContent>
-					</Card>
+				</Card>
+
 
 					<Card className="card-hover">
 						<CardHeader>

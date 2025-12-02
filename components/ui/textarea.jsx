@@ -1,7 +1,8 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-const Textarea = React.forwardRef(({ className, ...props }, ref) => {
+const Textarea = React.forwardRef(({ className, dir = "ltr", style, ...props }, ref) => {
+  const mergedStyle = { unicodeBidi: 'normal', ...style };
   return (
     (<textarea
       className={cn(
@@ -9,6 +10,8 @@ const Textarea = React.forwardRef(({ className, ...props }, ref) => {
         className
       )}
       ref={ref}
+      dir={dir}
+      style={mergedStyle}
       {...props} />)
   );
 })

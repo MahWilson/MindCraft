@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, updateDoc, arrayUnion, collection, addDoc, serverTimestamp, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,9 +17,14 @@ export default function TopicPage({ params }) {
   const { user, userData } = useAuth();
   const [post, setPost] = useState(null);
   const [reply, setReply] = useState('');
+  const [replyInputs, setReplyInputs] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
+  const [canParticipate, setCanParticipate] = useState(true);
+  const [replyList, setReplyList] = useState([]);
+  const [replyTree, setReplyTree] = useState([]);
+  const [canModerate, setCanModerate] = useState(false);
 
 
   useEffect(() => {
@@ -31,61 +36,142 @@ export default function TopicPage({ params }) {
     return () => unsub();
   }, [id]);
 
+  useEffect(() => {
+    const q = query(collection(db, 'posts', id, 'replies'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      const flat = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReplyList(flat);
+      // build nested tree
+      const byId = Object.create(null);
+      flat.forEach(r => { byId[r.id] = { ...r, replies: [] }; });
+      const roots = [];
+      flat.forEach(r => {
+        if (r.parentReplyId) {
+          const parent = byId[r.parentReplyId];
+          if (parent) parent.replies.push(byId[r.id]);
+        } else {
+          roots.push(byId[r.id]);
+        }
+      });
+      setReplyTree(roots);
+    });
+    return () => unsub();
+  }, [id]);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!post) return;
+      if (post.scope !== 'course' || !post.courseId) { setCanParticipate(true); return; }
+      if (!user) { setCanParticipate(false); return; }
+      try {
+        const ref = doc(db, 'enrollments', `${user.uid}_${post.courseId}`);
+        const snap = await getDoc(ref);
+        const allowed = snap.exists() || userData?.role === 'teacher' || userData?.role === 'admin';
+        setCanParticipate(allowed);
+      } catch {
+        setCanParticipate(false);
+      }
+    };
+    checkAccess();
+  }, [post, user, userData]);
+
+  useEffect(() => {
+    const checkModeration = async () => {
+      if (!post || !user) { setCanModerate(false); return; }
+      if (userData?.role === 'teacher' || userData?.role === 'admin') { setCanModerate(true); return; }
+      if (post.authorId === user.uid) { setCanModerate(true); return; }
+      if (post.courseId) {
+        try {
+          const cSnap = await getDoc(doc(db, 'courses', post.courseId));
+          setCanModerate(cSnap.exists() && cSnap.data().createdBy === user.uid);
+          return;
+        } catch {
+          setCanModerate(false);
+        }
+      } else {
+        setCanModerate(false);
+      }
+    };
+    checkModeration();
+  }, [post, user, userData]);
+
 
 
 
 
   const handleVote = async (postId, replyId, voteType) => {
     if (!user) return alert('Please sign in to vote');
-    
-    const res = await fetch('/api/forum/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId, replyId, userId: user.uid, voteType })
-    });
-    
-    if (!res.ok) {
-      const data = await res.json();
-      alert(data.error || 'Failed to vote');
+    try {
+      if (replyId) {
+        const rRef = doc(db, 'posts', postId, 'replies', replyId);
+        const rSnap = await getDoc(rRef);
+        if (!rSnap.exists()) return alert('Reply not found');
+        const data = rSnap.data();
+        const votes = { ...(data.votes || {}) };
+        const current = votes[user.uid];
+        let delta = 0;
+        if (current === voteType) { delete votes[user.uid]; delta = voteType === 'upvote' ? -1 : 1; }
+        else if (current) { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 2 : -2; }
+        else { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 1 : -1; }
+        await updateDoc(rRef, { votes, score: (data.score || 0) + delta });
+      } else {
+        const pRef = doc(db, 'posts', postId);
+        const pSnap = await getDoc(pRef);
+        if (!pSnap.exists()) return;
+        const data = pSnap.data();
+        const votes = { ...(data.votes || {}) };
+        const current = votes[user.uid];
+        let delta = 0;
+        if (current === voteType) { delete votes[user.uid]; delta = voteType === 'upvote' ? -1 : 1; }
+        else if (current) { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 2 : -2; }
+        else { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 1 : -1; }
+        await updateDoc(pRef, { votes, score: (data.score || 0) + delta });
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to vote');
     }
   };
 
-  const submitReply = async (parentReplyId = null) => {
-    if (!reply.trim()) return alert('Please enter a reply');
+  const submitReply = async (parentReplyId = null, contentOverride = null) => {
+    const text = contentOverride ?? reply;
+    if (!text.trim()) return alert('Please enter a reply');
     if (!user) return alert('Please sign in to reply');
+    if (!canParticipate) return alert('You are not allowed to reply in this course forum');
 
-    const res = await fetch('/api/forum/reply-enhanced', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        postId: id, 
-        authorId: user.uid, 
-        authorName: user.displayName || 'Anonymous', 
-        content: reply,
-        parentReplyId
-      }),
-    });
-    
-    const data = await res.json();
-    if (!res.ok || data.error) return alert(data.error || 'Failed to post reply');
-
-    
-    setReply('');
-    setReplyingTo(null);
+    try {
+      await addDoc(collection(db, 'posts', id, 'replies'), {
+        authorId: user.uid,
+        authorName: user.displayName || 'Anonymous',
+        content: text,
+        createdAt: serverTimestamp(),
+        votes: {},
+        score: 0,
+        parentReplyId: parentReplyId || null,
+      });
+      setReply('');
+      if (parentReplyId) setReplyInputs((prev) => ({ ...prev, [parentReplyId]: '' }));
+      setReplyingTo(null);
+    } catch (err) {
+      alert(err.message || 'Failed to post reply');
+    }
   };
 
   const deleteReply = async (replyId) => {
     if (!user) return alert('Please sign in');
     const confirmed = window.confirm('Delete this reply? This cannot be undone.');
     if (!confirmed) return;
-    const reason = window.prompt('Provide a brief reason for deletion (optional):') || '';
-    const res = await fetch('/api/forum/reply-enhanced', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: id, replyId, userId: user.uid, userRole: userData?.role, reason }),
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) alert(data.error || 'Failed to delete reply');
+    try {
+      const rRef = doc(db, 'posts', id, 'replies', replyId);
+      const rSnap = await getDoc(rRef);
+      if (!rSnap.exists()) return alert('Reply not found');
+      const data = rSnap.data();
+      const canDelete = canModerate || data.authorId === user.uid;
+      if (!canDelete) return alert('Not allowed');
+      // delete reply (children will remain orphaned; optional: cascade by querying and deleting where parentReplyId == replyId)
+      await deleteDoc(rRef);
+    } catch (err) {
+      alert(err.message || 'Failed to delete reply');
+    }
   };
 
   const editReply = async (replyId, currentContent) => {
@@ -96,21 +182,20 @@ export default function TopicPage({ params }) {
 
   const saveEdit = async (replyId) => {
     if (!editContent.trim()) return alert('Reply cannot be empty');
-    
-    const res = await fetch('/api/forum/reply-enhanced', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: id, replyId, userId: user.uid, content: editContent.trim() }),
-    });
-    
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      alert(data.error || 'Failed to edit reply');
-      return;
+    try {
+      const rRef = doc(db, 'posts', id, 'replies', replyId);
+      const rSnap = await getDoc(rRef);
+      if (!rSnap.exists()) return alert('Reply not found');
+      const data = rSnap.data();
+      if (data.authorId !== user.uid && userData?.role !== 'teacher' && userData?.role !== 'admin') {
+        return alert('You can only edit your own reply');
+      }
+      await updateDoc(rRef, { content: editContent.trim(), editedAt: serverTimestamp() });
+      setEditingId(null);
+      setEditContent('');
+    } catch (err) {
+      alert(err.message || 'Failed to edit reply');
     }
-    
-    setEditingId(null);
-    setEditContent('');
   };
 
   const VoteButtons = ({ item, type = 'reply', size = "sm" }) => {
@@ -141,28 +226,28 @@ export default function TopicPage({ params }) {
     );
   };
 
-  const ReplyComponent = ({ reply, depth = 0 }) => {
+  const ReplyComponent = ({ reply: replyItem, depth = 0 }) => {
     const maxDepth = 4;
-    const isEditing = editingId === reply.id;
-    const isReplying = replyingTo === reply.id;
+    const isEditing = editingId === replyItem.id;
+    const isReplying = replyingTo === replyItem.id;
     
     return (
       <div className={`${depth > 0 ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}>
         <Card className="p-4 mb-3 bg-white">
           <div className="flex space-x-3">
-            <VoteButtons item={reply} />
+            <VoteButtons item={replyItem} />
             
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2 text-sm text-gray-500">
                 <span className="flex items-center space-x-1">
                   <User size={12} />
-                  <span className="font-medium">{reply.authorName}</span>
+                  <span className="font-medium">{replyItem.authorName}</span>
                 </span>
                 <span className="flex items-center space-x-1">
                   <Clock size={12} />
-                  <span>{formatTimeAgo(reply.createdAt)}</span>
+                  <span>{formatTimeAgo(replyItem.createdAt)}</span>
                 </span>
-                {reply.editedAt && (
+                {replyItem.editedAt && (
                   <span className="text-xs text-gray-400">(edited)</span>
                 )}
               </div>
@@ -172,10 +257,11 @@ export default function TopicPage({ params }) {
                   <Textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
+                    autoFocus
                     className="min-h-[80px]"
                   />
                   <div className="flex space-x-2">
-                    <Button size="sm" onClick={() => saveEdit(reply.id)}>
+                    <Button size="sm" onClick={() => saveEdit(replyItem.id)}>
                       Save
                     </Button>
                     <Button 
@@ -189,14 +275,14 @@ export default function TopicPage({ params }) {
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-800 mb-3">{reply.content}</p>
+                  <p className="text-gray-800 mb-3">{replyItem.content}</p>
                   
                   <div className="flex items-center space-x-2">
-                    {user?.uid === reply.authorId && (
+                    {user?.uid === replyItem.authorId && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => editReply(reply.id, reply.content)}
+                        onClick={() => editReply(replyItem.id, replyItem.content)}
                         className="flex items-center space-x-1"
                       >
                         <Edit size={12} />
@@ -204,11 +290,11 @@ export default function TopicPage({ params }) {
                       </Button>
                     )}
                     
-                    {(userData?.role === 'teacher' || userData?.role === 'admin' || reply.authorId === user?.uid) && (
+                    {(canModerate || replyItem.authorId === user?.uid) && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => deleteReply(reply.id)}
+                        onClick={() => deleteReply(replyItem.id)}
                         className="flex items-center space-x-1 text-red-600"
                       >
                         <Trash2 size={12} />
@@ -220,7 +306,7 @@ export default function TopicPage({ params }) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setReplyingTo(reply.id)}
+                        onClick={() => setReplyingTo(replyItem.id)}
                         className="flex items-center space-x-1"
                       >
                         <MessageSquare size={12} />
@@ -233,12 +319,12 @@ export default function TopicPage({ params }) {
                     <div className="mt-3 space-y-2">
                       <Textarea
                         placeholder="Write a reply..."
-                        value={reply}
-                        onChange={(e) => setReply(e.target.value)}
+                        value={replyInputs[replyItem.id] || ''}
+                        onChange={(e) => setReplyInputs((prev) => ({ ...prev, [replyItem.id]: e.target.value }))}
                         className="min-h-[60px]"
                       />
                       <div className="flex space-x-2">
-                        <Button size="sm" onClick={() => submitReply(reply.id)}>
+                        <Button size="sm" onClick={() => submitReply(replyItem.id, replyInputs[replyItem.id] || '')}>
                           Post Reply
                         </Button>
                         <Button 
@@ -257,9 +343,9 @@ export default function TopicPage({ params }) {
           </div>
         </Card>
         
-        {reply.replies && reply.replies.length > 0 && (
+        {replyItem.replies && replyItem.replies.length > 0 && (
           <div className="mt-2">
-            {reply.replies.map((nestedReply) => (
+            {replyItem.replies.map((nestedReply) => (
               <ReplyComponent key={nestedReply.id} reply={nestedReply} depth={depth + 1} />
             ))}
           </div>
@@ -323,30 +409,34 @@ export default function TopicPage({ params }) {
 
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">
-          {post.replies?.length || 0} Comments
+          {replyList.length} Comments
         </h2>
         
-        <Card className="p-4 mb-6 bg-white">
+      <Card className="p-4 mb-6 bg-white">
+          {!canParticipate && (
+            <div className="mb-3 text-red-600">You must be enrolled in this course to participate.</div>
+          )}
           <Textarea
             placeholder="What are your thoughts? Share your perspective..."
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             className="mb-3 min-h-[100px]"
+            disabled={!canParticipate}
           />
           <div className="flex justify-end">
-            <Button onClick={() => submitReply()} size="lg">
+            <Button onClick={() => submitReply()} size="lg" disabled={!canParticipate}>
               Post Comment
             </Button>
           </div>
         </Card>
         
         <div className="space-y-2">
-          {post.replies?.map((reply) => (
+          {replyTree.map((reply) => (
             <ReplyComponent key={reply.id} reply={reply} />
           ))}
         </div>
         
-        {(!post.replies || post.replies.length === 0) && (
+        {replyList.length === 0 && (
           <div className="text-center py-8">
             <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No comments yet</h3>

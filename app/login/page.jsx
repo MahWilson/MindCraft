@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,16 +31,23 @@ export default function LoginPage() {
 			const userDocRef = doc(db, 'users', user.uid);
 			const userDoc = await getDoc(userDocRef);
 
-			let role;
-			if (userDoc.exists()) {
-				// User profile exists in Firestore
-				role = userDoc.data().role;
-			} else {
-				// First time login - check if it's admin (from admin.json)
-				// For now, we'll create a default user profile
-				// TODO: Handle admin login separately or create admin user in Firestore
-				role = 'student'; // Default fallback
-			}
+      let role;
+      const ADMIN_EMAILS = ['admin@mindcraft.local', 'testadmin@gmail.com'];
+      const TEACHER_EMAILS = ['teacher1@gmail.com', 'teach1@gmail.com'];
+      if (userDoc.exists()) {
+        role = userDoc.data().role;
+        const desired = ADMIN_EMAILS.includes(user.email)
+          ? 'admin'
+          : TEACHER_EMAILS.includes(user.email)
+          ? 'teacher'
+          : role;
+        role = desired; // do not write to Firestore; use desired for routing/session only
+      } else {
+        if (ADMIN_EMAILS.includes(user.email)) role = 'admin';
+        else if (TEACHER_EMAILS.includes(user.email)) role = 'teacher';
+        else role = 'student';
+        // do not create Firestore profile here to avoid any write permission conflicts
+      }
 
 			// Step 3: Set session cookies (for server-side role checks)
 			await fetch('/api/auth/session', {

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { db } from "@/firebase";
-import { onSnapshot, collection, query, orderBy, doc, updateDoc, arrayUnion, serverTimestamp, addDoc } from "firebase/firestore";
+import { onSnapshot, collection, query, orderBy, doc, updateDoc, arrayUnion, serverTimestamp, addDoc, getDoc, deleteField, deleteDoc } from "firebase/firestore";
 import { MessageSquare, Pin, Trash2, Smile, ArrowUp, ArrowDown, Clock, User, TrendingUp, Award } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -93,77 +93,103 @@ function ForumPage() {
     if (!user) return alert('Please sign in');
     const confirmed = window.confirm('Delete this post? This cannot be undone.');
     if (!confirmed) return;
-    const reason = window.prompt('Provide a brief reason for deletion (optional):') || '';
-    const res = await fetch("/api/forum/delete", {
-      method: "POST",
-      body: JSON.stringify({ postId, userId: user.uid, userRole: userData?.role, reason }),
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) alert(data.error || 'Failed to delete post');
+    if (userData?.role !== 'teacher' && userData?.role !== 'admin') {
+      return alert('Only teachers/admins can delete posts');
+    }
+    try {
+      const postRef = doc(db, 'posts', postId);
+      const snap = await getDoc(postRef);
+      if (!snap.exists()) return alert('Post not found');
+      const reason = window.prompt('Provide a brief reason for deletion (optional):') || '';
+      await addDoc(collection(db, 'audit_logs'), {
+        action: 'DELETE_POST',
+        deletedPostId: postId,
+        deletedContent: snap.data(),
+        deletedBy: user.uid,
+        reason,
+        timestamp: serverTimestamp(),
+      });
+      await deleteDoc(postRef);
+    } catch (err) {
+      alert(err.message || 'Failed to delete post');
+    }
   };
 
   const handlePin = async (postId) => {
-    await fetch("/api/forum/pin", {
-      method: "PATCH",
-      body: JSON.stringify({ postId, userRole: userData?.role }),
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const postRef = doc(db, 'posts', postId);
+      const snap = await getDoc(postRef);
+      if (!snap.exists()) return;
+      const post = snap.data();
+      let permitted = userData?.role === 'teacher' || userData?.role === 'admin' || post.authorId === user?.uid;
+      if (!permitted && post.courseId) {
+        const cSnap = await getDoc(doc(db, 'courses', post.courseId));
+        permitted = cSnap.exists() && cSnap.data().createdBy === user?.uid;
+      }
+      if (!permitted) return alert('Only course owner/teacher/admin can pin');
+      const current = !!post.isPinned;
+      await updateDoc(postRef, { isPinned: !current });
+    } catch (err) {
+      alert(err.message || 'Failed to pin/unpin');
+    }
   };
 
   const handleVote = async (postId, voteType) => {
     if (!user) return alert('Please sign in to vote');
-    
-    const res = await fetch('/api/forum/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId, userId: user.uid, voteType })
-    });
-    
-    if (!res.ok) {
-      const data = await res.json();
-      alert(data.error || 'Failed to vote');
+    try {
+      const pRef = doc(db, 'posts', postId);
+      const pSnap = await getDoc(pRef);
+      if (!pSnap.exists()) return;
+      const data = pSnap.data();
+      const votes = { ...(data.votes || {}) };
+      const current = votes[user.uid];
+      let delta = 0;
+      if (current === voteType) { delete votes[user.uid]; delta = voteType === 'upvote' ? -1 : 1; }
+      else if (current) { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 2 : -2; }
+      else { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 1 : -1; }
+      await updateDoc(pRef, { votes, score: (data.score || 0) + delta });
+    } catch (err) {
+      alert(err.message || 'Failed to vote');
     }
   };
 
   const handleReact = async (postId, emoji) => {
-    await fetch("/api/forum/react", {
-      method: "POST",
-      body: JSON.stringify({ postId, userId: user.uid, emoji }),
-      headers: { "Content-Type": "application/json" },
-    });
+    if (!user) return alert('Please sign in to react');
+    try {
+      const ref = doc(db, 'posts', postId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const current = data.reactions?.[user.uid] || null;
+      if (current === emoji) {
+        await updateDoc(ref, { [`reactions.${user.uid}`]: deleteField() });
+      } else {
+        await updateDoc(ref, { [`reactions.${user.uid}`]: emoji });
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to react');
+    }
   };
 
   const handleReply = async (postId) => {
-    const reply = replyContent[postId];
-    if (!reply) {
-      alert('Please enter a reply');
-      return;
-    }
-    if (!user) {
-      alert('Please sign in to reply');
-      return;
-    }
-
-    const res = await fetch('/api/forum/reply-enhanced', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        postId,
+    const text = replyContent[postId];
+    if (!text) return alert('Please enter a reply');
+    if (!user) return alert('Please sign in to reply');
+    try {
+      await addDoc(collection(db, 'posts', postId, 'replies'), {
         authorId: user.uid,
         authorName: user.displayName || 'Anonymous',
-        content: reply,
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      alert(data.error || 'Failed to submit reply');
-      return;
+        content: text,
+        createdAt: serverTimestamp(),
+        votes: {},
+        score: 0,
+        parentReplyId: null,
+      });
+      setReplyContent((prev) => ({ ...prev, [postId]: '' }));
+      setReplyOpen((prev) => ({ ...prev, [postId]: false }));
+    } catch (err) {
+      alert(err.message || 'Failed to submit reply');
     }
-
-    setReplyContent((prev) => ({ ...prev, [postId]: "" }));
-    setReplyOpen((prev) => ({ ...prev, [postId]: false }));
   };
 
   const VoteButtons = ({ post, size = "sm" }) => {
@@ -341,24 +367,14 @@ function ForumPage() {
                       ))}
                     </div>
                     
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setReplyOpen((prev) => ({
-                          ...prev,
-                          [post.id]: !prev[post.id],
-                        }))
-                      }
-                      className="flex items-center space-x-1 text-blue-600"
-                    >
+                    <Link href={`/forum/${post.id}`} className="flex items-center space-x-1 text-blue-600">
                       <MessageSquare size={16} />
-                      <span>Reply ({post.replies?.length || 0})</span>
-                    </Button>
+                      <span>View & Reply</span>
+                    </Link>
                   </div>
                   
                   <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span>{post.replies?.length || 0} comments</span>
+                    <span>comments</span>
                     <span>{Object.keys(post.reactions || {}).length} reactions</span>
                   </div>
                 </div>
