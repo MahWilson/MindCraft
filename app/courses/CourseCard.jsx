@@ -78,7 +78,7 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 		setLoading(true);
 		setError('');
 		try {
-			await updateDoc(doc(db, 'courses', course.id), {
+			await updateDoc(doc(db, 'course', course.id), {
 				status: 'draft',
 				updatedAt: serverTimestamp(),
 			});

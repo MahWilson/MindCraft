@@ -30,7 +30,7 @@ export default function MyCoursesPage() {
 			if (user) {
 				setUserId(user.uid);
 				// Get user role
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setRole(userDoc.data().role);
 				}
@@ -55,7 +55,7 @@ export default function MyCoursesPage() {
 				if (currentRole === 'student' && userId) {
 					// Get all enrollments for this student
 					const enrollmentsQuery = query(
-						collection(db, 'enrollments'),
+						collection(db, 'enrollment'),
 						where('studentId', '==', userId)
 					);
 					const enrollmentsSnap = await getDocs(enrollmentsQuery);
@@ -75,7 +75,7 @@ export default function MyCoursesPage() {
 					if (courseIds.length > 0) {
 						const courses = [];
 						for (const courseId of courseIds) {
-							const courseDoc = await getDoc(doc(db, 'courses', courseId));
+							const courseDoc = await getDoc(doc(db, 'course', courseId));
 							if (courseDoc.exists()) {
 								courses.push({ id: courseDoc.id, ...courseDoc.data() });
 							}
@@ -84,7 +84,7 @@ export default function MyCoursesPage() {
 					}
 				} else if (currentRole === 'admin') {
 					// Admins see all courses
-					const coursesQuery = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
+					const coursesQuery = query(collection(db, 'course'), orderBy('createdAt', 'desc'));
 					const snapshot = await getDocs(coursesQuery);
 					const coursesList = snapshot.docs.map(doc => ({
 						id: doc.id,
@@ -94,12 +94,12 @@ export default function MyCoursesPage() {
 				} else if (currentRole === 'teacher') {
 					// Teachers see published + their own drafts
 					const publishedQuery = query(
-						collection(db, 'courses'),
+						collection(db, 'course'),
 						where('status', '==', 'published'),
 						orderBy('createdAt', 'desc')
 					);
 					const myDraftsQuery = query(
-						collection(db, 'courses'),
+						collection(db, 'course'),
 						where('status', '==', 'draft'),
 						where('createdBy', '==', userId),
 						orderBy('createdAt', 'desc')

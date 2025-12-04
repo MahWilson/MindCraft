@@ -31,7 +31,7 @@ export default function CourseDetailPage() {
 			if (user) {
 				setUserId(user.uid);
 				// Get user role
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setRole(userDoc.data().role);
 					if (userDoc.data().role === 'student') {
@@ -56,7 +56,7 @@ export default function CourseDetailPage() {
 		async function loadCourse() {
 			try {
 				// Load course
-				const courseDoc = await getDoc(doc(db, 'courses', courseId));
+				const courseDoc = await getDoc(doc(db, 'course', courseId));
 				if (!courseDoc.exists()) {
 					setError('Course not found');
 					setLoading(false);
@@ -75,7 +75,7 @@ export default function CourseDetailPage() {
 						
 						for (const moduleId of courseData.modules) {
 							try {
-								const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+								const moduleDoc = await getDoc(doc(db, 'module', moduleId));
 								if (moduleDoc.exists()) {
 									loadedModules.push({
 										id: moduleDoc.id,
@@ -98,7 +98,7 @@ export default function CourseDetailPage() {
 								try {
 									const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore');
 									const lessonsQuery = query(
-										collection(db, 'lessons'),
+										collection(db, 'lesson'),
 										where('moduleId', '==', module.id),
 										orderBy('order', 'asc')
 									);
@@ -116,7 +116,7 @@ export default function CourseDetailPage() {
 										const fallbackLessons = [];
 										for (const lessonId of module.lessons) {
 											try {
-												const lessonDoc = await getDoc(doc(db, 'lessons', lessonId));
+												const lessonDoc = await getDoc(doc(db, 'lesson', lessonId));
 												if (lessonDoc.exists()) {
 													fallbackLessons.push({
 														id: lessonDoc.id,

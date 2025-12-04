@@ -12,7 +12,7 @@ export async function DELETE(request, { params }) {
 		}
 
 		// Verify module exists
-		const moduleRef = doc(db, 'modules', moduleId);
+		const moduleRef = doc(db, 'module', moduleId);
 		const moduleDoc = await getDoc(moduleRef);
 
 		if (!moduleDoc.exists()) {
@@ -26,7 +26,7 @@ export async function DELETE(request, { params }) {
 		if (moduleData.lessons && moduleData.lessons.length > 0) {
 			for (const lessonId of moduleData.lessons) {
 				try {
-					await deleteDoc(doc(db, 'lessons', lessonId));
+					await deleteDoc(doc(db, 'lesson', lessonId));
 				} catch (err) {
 					console.error(`Error deleting lesson ${lessonId}:`, err);
 				}
@@ -38,7 +38,7 @@ export async function DELETE(request, { params }) {
 
 		// Remove module from course
 		if (courseId) {
-			const courseRef = doc(db, 'courses', courseId);
+			const courseRef = doc(db, 'course', courseId);
 			const courseDoc = await getDoc(courseRef);
 			if (courseDoc.exists()) {
 				const courseModules = courseDoc.data().modules || [];

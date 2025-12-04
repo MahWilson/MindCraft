@@ -22,7 +22,7 @@ MindCraft is a lightweight web learning platform for secondary school programmin
 - Offline-first for learning materials; small client bundle; accessible UI
 
 ## Firestore (core collections)
-- `users`, `courses`, `modules`, `lessons`, `assessments`, `submissions`, `progress`, `forum`
+- `user`, `course`, `module`, `lesson`, `assessment`, `submission`, `progress`, `forum`
 
 ## Acceptance (Sprint 1)
 - Teacher can create course (draft/published), persisted with timestamps and createdBy

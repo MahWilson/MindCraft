@@ -23,7 +23,7 @@ export default function LessonPreviewPage() {
 		async function loadLesson() {
 			try {
 				// Load lesson
-				const lessonDoc = await getDoc(doc(db, 'lessons', lessonId));
+				const lessonDoc = await getDoc(doc(db, 'lesson', lessonId));
 				if (!lessonDoc.exists()) {
 					setError('Lesson not found');
 					setLoading(false);
@@ -34,7 +34,7 @@ export default function LessonPreviewPage() {
 				setLesson(lessonData);
 
 				// Load module
-				const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+				const moduleDoc = await getDoc(doc(db, 'module', moduleId));
 				if (moduleDoc.exists()) {
 					setModule({ id: moduleDoc.id, ...moduleDoc.data() });
 				}

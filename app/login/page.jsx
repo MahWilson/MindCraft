@@ -28,7 +28,7 @@ export default function LoginPage() {
 			const user = userCredential.user; // This has the uid
 
 			// Step 2: Get user role from Firestore users collection
-			const userDocRef = doc(db, 'users', user.uid);
+			const userDocRef = doc(db, 'user', user.uid);
 			const userDoc = await getDoc(userDocRef);
 
 			let role;

@@ -5,7 +5,7 @@ import { db } from '@/firebase';
 // Check if student is enrolled in a course
 async function isEnrolled(studentId, courseId) {
 	try {
-		const enrollmentRef = doc(db, 'enrollments', `${studentId}_${courseId}`);
+		const enrollmentRef = doc(db, 'enrollment', `${studentId}_${courseId}`);
 		const enrollmentDoc = await getDoc(enrollmentRef);
 		return enrollmentDoc.exists();
 	} catch (err) {
@@ -25,7 +25,7 @@ export async function POST(request, { params }) {
 		}
 
 		// Verify course exists
-		const courseRef = doc(db, 'courses', courseId);
+		const courseRef = doc(db, 'course', courseId);
 		const courseDoc = await getDoc(courseRef);
 
 		if (!courseDoc.exists()) {
@@ -44,7 +44,7 @@ export async function POST(request, { params }) {
 		}
 
 		// Create enrollment
-		const enrollmentRef = doc(db, 'enrollments', `${studentId}_${courseId}`);
+		const enrollmentRef = doc(db, 'enrollment', `${studentId}_${courseId}`);
 		await setDoc(enrollmentRef, {
 			studentId,
 			courseId,

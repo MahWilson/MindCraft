@@ -34,7 +34,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 		setLoading(true);
 		try {
 			// Load course to get module IDs
-			const courseDoc = await getDoc(doc(db, 'courses', courseId));
+			const courseDoc = await getDoc(doc(db, 'course', courseId));
 			if (!courseDoc.exists()) {
 				setLoading(false);
 				return;
@@ -53,7 +53,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 			const loadedModules = [];
 			for (const moduleId of moduleIds) {
 				try {
-					const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+					const moduleDoc = await getDoc(doc(db, 'module', moduleId));
 					if (moduleDoc.exists()) {
 						const moduleData = {
 							id: moduleDoc.id,
@@ -67,7 +67,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 							try {
 								const { collection, query, where, getDocs } = await import('firebase/firestore');
 								const lessonsQuery = query(
-									collection(db, 'lessons'),
+									collection(db, 'lesson'),
 									where('moduleId', '==', moduleId)
 								);
 								const lessonsSnapshot = await getDocs(lessonsQuery);
@@ -166,10 +166,10 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 					updatedAt: serverTimestamp(),
 				};
 
-				const moduleRef = await addDoc(collection(db, 'modules'), moduleData);
+				const moduleRef = await addDoc(collection(db, 'module'), moduleData);
 
 				// Link module to course
-				const courseRef = doc(db, 'courses', courseId);
+				const courseRef = doc(db, 'course', courseId);
 				const courseDoc = await getDoc(courseRef);
 
 				if (courseDoc.exists()) {

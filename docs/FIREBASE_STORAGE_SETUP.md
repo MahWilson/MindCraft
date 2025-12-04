@@ -33,7 +33,7 @@ service firebase.storage {
     }
     
     function getUserRole() {
-      let userDoc = get(/databases/(default)/documents/users/$(request.auth.uid));
+      let userDoc = get(/databases/(default)/documents/user/$(request.auth.uid));
       return userDoc != null && userDoc.data != null && 'role' in userDoc.data
              ? userDoc.data.role
              : null;
@@ -41,13 +41,13 @@ service firebase.storage {
     
     function isAdmin() {
       return isSignedIn() && 
-             exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/(default)/documents/user/$(request.auth.uid)) &&
              getUserRole() == 'admin';
     }
     
     function isTeacher() {
       return isSignedIn() && 
-             exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/(default)/documents/user/$(request.auth.uid)) &&
              getUserRole() == 'teacher';
     }
     

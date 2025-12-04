@@ -36,7 +36,7 @@ export default function AdminRegisterPage() {
 			const user = userCredential.user; // This gives us the uid
 
 			// Step 2: Create user profile in Firestore
-			await setDoc(doc(db, 'users', user.uid), {
+			await setDoc(doc(db, 'user', user.uid), {
 				name: name.trim(),
 				email: email.trim(),
 				role: role,

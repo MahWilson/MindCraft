@@ -44,7 +44,7 @@ export default function ProfilePage() {
 
 			// Load user data from Firestore
 			try {
-				const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+				const userDoc = await getDoc(doc(db, 'user', firebaseUser.uid));
 				if (userDoc.exists()) {
 					const data = { id: userDoc.id, ...userDoc.data() };
 					setUserData(data);
@@ -151,7 +151,7 @@ export default function ProfilePage() {
 				updateData.profilePicture = pictureUrl;
 			}
 
-			await updateDoc(doc(db, 'users', user.uid), updateData);
+			await updateDoc(doc(db, 'user', user.uid), updateData);
 			console.log('Firestore updated successfully');
 
 			// Update local state with the new data
@@ -181,7 +181,7 @@ export default function ProfilePage() {
 
 		try {
 			// Update Firestore to remove profile picture
-			await updateDoc(doc(db, 'users', user.uid), {
+			await updateDoc(doc(db, 'user', user.uid), {
 				profilePicture: '',
 			});
 

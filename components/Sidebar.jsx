@@ -20,7 +20,9 @@ import {
 	Search,
 	User,
 	Users,
-	Settings
+	Settings,
+	Code,
+	Lightbulb
 } from 'lucide-react';
 
 const iconMap = {
@@ -41,6 +43,8 @@ const iconMap = {
 	'Module Library': BookOpen,
 	'Profile': User,
 	'Sign In': null,
+	'Coding Help': Code,
+	'Explain Concept': Lightbulb,
 };
 
 export default function Sidebar({ role, navItems }) {
@@ -61,7 +65,7 @@ export default function Sidebar({ role, navItems }) {
 		unsubscribeAuth = onAuthStateChanged(auth, (user) => {
 			if (user) {
 				// Set up real-time listener for user profile changes
-				const userDocRef = doc(db, 'users', user.uid);
+				const userDocRef = doc(db, 'user', user.uid);
 				unsubscribeFirestore = onSnapshot(
 					userDocRef,
 					(snapshot) => {

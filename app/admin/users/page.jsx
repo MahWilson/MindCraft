@@ -30,7 +30,7 @@ export default function ManageUsersPage() {
 	const loadUsers = async () => {
 		try {
 			// Fetch directly from Firestore (client-side has auth context)
-			const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+			const usersQuery = query(collection(db, 'user'), orderBy('createdAt', 'desc'));
 			const usersSnapshot = await getDocs(usersQuery);
 			const usersList = usersSnapshot.docs.map(doc => ({
 				id: doc.id,
@@ -59,7 +59,7 @@ export default function ManageUsersPage() {
 			}
 
 			try {
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (!userDoc.exists()) {
 					console.error('User document does not exist for UID:', user.uid);
 					setError('User profile not found. Please contact an administrator.');
@@ -189,7 +189,7 @@ export default function ManageUsersPage() {
 				updateData.profilePicture = pictureUrl;
 			}
 
-			await updateDoc(doc(db, 'users', editingUserId), updateData);
+			await updateDoc(doc(db, 'user', editingUserId), updateData);
 
 			setSuccess('User updated successfully!');
 			setTimeout(() => setSuccess(''), 3000);

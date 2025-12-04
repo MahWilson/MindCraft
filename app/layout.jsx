@@ -2,6 +2,7 @@ import '../styles/globals.css';
 import { cookies } from 'next/headers';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import { LanguageProvider } from '@/app/contexts/LanguageContext';
 
 export const metadata = {
 	title: 'MindCraft',
@@ -22,6 +23,7 @@ function getNavItems(role) {
 			{ href: '/admin/courses', label: 'Manage Courses' },
 			{ href: '/admin/settings', label: 'Settings' },
 			{ href: '/dashboard/modules', label: 'Module Library' },
+			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
@@ -46,6 +48,8 @@ function getNavItems(role) {
 			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/progress', label: 'Progress' },
 			{ href: '/forum', label: 'Forum' },
+			{ href: '/ai/coding-help', label: 'Coding Help' },
+			{ href: '/ai/explain', label: 'Explain Concept' },
 		];
 	}
 	// Guest nav
@@ -63,19 +67,21 @@ export default async function RootLayout({ children }) {
 	return (
 		<html lang="en">
 			<body className="min-h-screen bg-neutralLight">
-				<div className="flex min-h-screen">
-					{/* Sidebar - in normal flow, takes up space */}
-					<Sidebar role={role} navItems={navItems} />
-					
-					{/* Main content area */}
-					<div className="flex-1 flex flex-col min-w-0">
-						{/* Header - spans rest of width */}
-						<Header role={role} />
+				<LanguageProvider>
+					<div className="flex min-h-screen">
+						{/* Sidebar - in normal flow, takes up space */}
+						<Sidebar role={role} navItems={navItems} />
 						
-						{/* Main content */}
-						<main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">{children}</main>
+						{/* Main content area */}
+						<div className="flex-1 flex flex-col min-w-0">
+							{/* Header - spans rest of width */}
+							<Header role={role} />
+							
+							{/* Main content */}
+							<main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">{children}</main>
+						</div>
 					</div>
-				</div>
+				</LanguageProvider>
 			</body>
 		</html>
 	);

@@ -33,7 +33,7 @@ export default function CreateAssessmentPage() {
 			if (user) {
 				setCurrentUserId(user.uid);
 				const { doc, getDoc } = await import('firebase/firestore');
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					const role = userDoc.data().role;
 					setUserRole(role);
@@ -58,7 +58,7 @@ export default function CreateAssessmentPage() {
 	async function loadCourses() {
 		setLoading(true);
 		try {
-			const coursesQuery = query(collection(db, 'courses'));
+			const coursesQuery = query(collection(db, 'course'));
 			const snapshot = await getDocs(coursesQuery);
 			const loadedCourses = snapshot.docs.map(doc => ({
 				id: doc.id,
@@ -251,7 +251,7 @@ export default function CreateAssessmentPage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			await addDoc(collection(db, 'assessments'), assessmentData);
+			await addDoc(collection(db, 'assessment'), assessmentData);
 
 			router.push('/assessments');
 		} catch (err) {
