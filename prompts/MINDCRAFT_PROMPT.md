@@ -48,14 +48,25 @@
 
 ### Firestore collections (core)
 
+**⚠️ CRITICAL: All collections use SINGULAR names only. Do NOT use plural forms.**
+
 * `user` `{ uid, name, email, role: "admin|teacher|student", profilePic, class, createdAt, status }`
 * `course` `{ id, title, description, status: "draft|published", modules: [moduleIds], createdBy, createdAt, updatedAt }`
 * `module` `{ id, courseId, title, order, lessons: [lessonIds] }`
 * `lesson` `{ id, moduleId, title, contentHtml, materials: [storageUrls], aiGenerated: bool, updatedAt }`
 * `assessment` `{ id, courseId, title, type: "quiz|coding|assignment", questions: [...], config: {start,end,timer,attempts}, published }`
-* `submission` `{ id, assessmentId, studentId, files:[url], answers: {...}, grade, feedback, status, submittedAt }`
+* `assignment` `{ id, courseId, title, description, deadline, status, isOpen, allowLateSubmissions }`
+* `submission` `{ id, assessmentId, assignmentId, studentId, files:[url], answers: {...}, score, totalPoints, grade, feedback, status, submittedAt }`
+* `enrollment` `{ studentId, courseId, enrolledAt, progress: {...} }`
 * `progress` (or derive on the fly) `{ studentId, courseId, metrics: {...} }`
 * `forum` `{ id, courseId, authorId, content, replies, pinned, deleted }`
+* `setting` `{ key, value, updatedAt }`
+
+**Collection Naming Rules:**
+- ✅ Always use singular: `collection(db, 'user')` 
+- ❌ Never use plural: `collection(db, 'users')` - DEPRECATED
+- Migration from plural to singular is complete - do not create plural collections
+- Reference `docs/FIRESTORE_SECURITY_RULES.md` for current collection structure
 
 ### Minimal API routes (Next.js API)
 
