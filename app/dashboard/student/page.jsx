@@ -140,10 +140,19 @@ export default function StudentDashboard() {
 								</div>
 							</Flex>
 						</CardHeader>
-						<CardContent>
-							<Button variant="ghost" className="w-full" disabled>
-								Coming Soon
-							</Button>
+						<CardContent className="space-y-2">
+							<Link href="/ai/coding-help" className="block">
+								<Button variant="ghost" className="w-full justify-between group">
+									Coding Help
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
+							<Link href="/ai/explain" className="block">
+								<Button variant="ghost" className="w-full justify-between group">
+									Explain Concept
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
 						</CardContent>
 					</Card>
 				</div>

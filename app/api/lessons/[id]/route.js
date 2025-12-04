@@ -12,7 +12,7 @@ export async function DELETE(request, { params }) {
 		}
 
 		// Verify lesson exists
-		const lessonRef = doc(db, 'lessons', lessonId);
+		const lessonRef = doc(db, 'lesson', lessonId);
 		const lessonDoc = await getDoc(lessonRef);
 
 		if (!lessonDoc.exists()) {
@@ -27,7 +27,7 @@ export async function DELETE(request, { params }) {
 
 		// Remove lesson from module
 		if (moduleId) {
-			const moduleRef = doc(db, 'modules', moduleId);
+			const moduleRef = doc(db, 'module', moduleId);
 			const moduleDoc = await getDoc(moduleRef);
 			if (moduleDoc.exists()) {
 				const moduleLessons = moduleDoc.data().lessons || [];

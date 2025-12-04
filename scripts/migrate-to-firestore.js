@@ -64,7 +64,7 @@ async function migrateUsers() {
 			}
 			
 			// Create user profile in Firestore
-			await setDoc(doc(db, 'users', uid), {
+			await setDoc(doc(db, 'user', uid), {
 				name: user.name,
 				email: user.email,
 				role: user.role,
@@ -117,7 +117,7 @@ async function migrateCourses() {
 				updatedAt: course.updatedAt ? new Date(course.updatedAt) : serverTimestamp(),
 			};
 			
-			await addDoc(collection(db, 'courses'), courseData);
+			await addDoc(collection(db, 'course'), courseData);
 			console.log(`✅ Migrated course: "${course.title}"`);
 		}
 	} catch (err) {

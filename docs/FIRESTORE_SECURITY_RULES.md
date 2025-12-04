@@ -17,7 +17,7 @@ service cloud.firestore {
     // Helper function to get user role (robust version)
     function getUserRole() {
       // Check if user document exists and has role field
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let userDoc = get(/databases/$(database)/documents/user/$(request.auth.uid));
       return userDoc != null && userDoc.data != null && 'role' in userDoc.data
              ? userDoc.data.role
              : null;
@@ -25,19 +25,19 @@ service cloud.firestore {
     
     function isAdmin() {
       return request.auth != null && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/user/$(request.auth.uid)) &&
              getUserRole() == 'admin';
     }
     
     function isTeacher() {
       return request.auth != null && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/user/$(request.auth.uid)) &&
              getUserRole() == 'teacher';
     }
     
     function isStudent() {
       return request.auth != null && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/user/$(request.auth.uid)) &&
              getUserRole() == 'student';
     }
     
@@ -45,10 +45,10 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
     
-    // Users Collection
+    // User Collection
     // IMPORTANT: This must allow reads for authenticated users FIRST
     // so that getUserRole() can work in other rules
-    match /users/{userId} {
+    match /user/{userId} {
       // Allow any authenticated user to read users (needed for role checks)
       // This MUST be first to allow getUserRole() to work
       allow read: if request.auth != null;
@@ -63,13 +63,13 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
     
-    // Courses Collection
-    match /courses/{courseId} {
-      // Anyone can read published courses (even without auth)
+    // Course Collection
+    match /course/{courseId} {
+      // Anyone can read published courses (even without auth) - works for both document reads and collection queries
       allow read: if resource.data.status == 'published';
       
-      // Authenticated users can read published courses
-      allow read: if request.auth != null && resource.data.status == 'published';
+      // Explicitly allow students to read published courses (for collection queries)
+      allow read: if request.auth != null && isStudent() && resource.data.status == 'published';
       
       // Teachers and admins can read ALL courses (including drafts)
       // This allows teachers to see all courses when querying the collection
@@ -84,8 +84,8 @@ service cloud.firestore {
       );
     }
     
-    // Modules Collection
-    match /modules/{moduleId} {
+    // Module Collection
+    match /module/{moduleId} {
       // Teachers and admins can read all modules
       // This is permissive to allow collection queries
       allow read: if request.auth != null && (isTeacher() || isAdmin());
@@ -97,8 +97,8 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
     }
     
-    // Lessons Collection
-    match /lessons/{lessonId} {
+    // Lesson Collection
+    match /lesson/{lessonId} {
       // Teachers and admins can read all lessons
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
@@ -109,8 +109,8 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
     }
     
-    // Enrollments Collection (for course enrollments)
-    match /enrollments/{enrollmentId} {
+    // Enrollment Collection (for course enrollments)
+    match /enrollment/{enrollmentId} {
       // Students can read their own enrollments
       allow read: if request.auth != null && isOwner(resource.data.studentId);
       
@@ -124,8 +124,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
-    // Assessments Collection
-    match /assessments/{assessmentId} {
+    // Assessment Collection
+    match /assessment/{assessmentId} {
       // Teachers and admins can read all assessments (published and draft)
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
@@ -136,8 +136,8 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
     }
     
-    // Assignments Collection
-    match /assignments/{assignmentId} {
+    // Assignment Collection
+    match /assignment/{assignmentId} {
       // Teachers and admins can read all assignments (published and draft)
       allow read: if request.auth != null && (isTeacher() || isAdmin());
       
@@ -150,8 +150,8 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && (isTeacher() || isAdmin());
     }
     
-    // Submissions Collection
-    match /submissions/{submissionId} {
+    // Submission Collection
+    match /submission/{submissionId} {
       // Students can read their own submissions
       allow read: if request.auth != null && isOwner(resource.data.studentId);
       
@@ -165,8 +165,8 @@ service cloud.firestore {
       allow update: if request.auth != null && (isTeacher() || isAdmin());
     }
     
-    // Settings Collection (for app-wide settings like logo)
-    match /settings/{settingId} {
+    // Setting Collection (for app-wide settings like logo)
+    match /setting/{settingId} {
       // All authenticated users can read settings (for logo display)
       allow read: if request.auth != null;
       // Only admins can create/update settings
@@ -233,10 +233,10 @@ service cloud.firestore {
 
 **These are completely separate!** Make sure you apply rules to the correct place.
 
-### Users Collection Must Allow Reads First
+### User Collection Must Allow Reads First
 
-The `users` collection rules **must** allow authenticated users to read first (line 58), because:
-- Other rules call `getUserRole()` which reads from the `users` collection
+The `user` collection rules **must** allow authenticated users to read first (line 58), because:
+- Other rules call `getUserRole()` which reads from the `user` collection
 - If users can't read their own document, `isTeacher()` and `isAdmin()` will fail
 - This creates a circular dependency issue
 
@@ -255,7 +255,7 @@ The `users` collection rules **must** allow authenticated users to read first (l
    - Make sure the rules are published
 
 2. **Verify user document exists**
-   - Go to Firestore Database → `users` collection
+   - Go to Firestore Database → `user` collection
    - Find your user document (by your user ID from Firebase Auth)
    - Make sure it has a `role` field with value `'teacher'` or `'admin'`
 
@@ -270,7 +270,7 @@ The `users` collection rules **must** allow authenticated users to read first (l
 
 ### "Missing or insufficient permissions" for User Profile
 
-- The `users` collection must allow `allow read: if request.auth != null;` (line 58)
+- The `user` collection must allow `allow read: if request.auth != null;` (line 58)
 - This is needed so the sidebar can load the user profile
 - Make sure this rule is present and published
 

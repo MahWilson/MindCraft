@@ -12,7 +12,7 @@ export async function POST(request) {
 		}
 
 		// Verify module exists
-		const moduleRef = doc(db, 'modules', moduleId);
+		const moduleRef = doc(db, 'module', moduleId);
 		const moduleDoc = await getDoc(moduleRef);
 
 		if (!moduleDoc.exists()) {
@@ -31,7 +31,7 @@ export async function POST(request) {
 			updatedAt: serverTimestamp(),
 		};
 
-		const lessonRef = await addDoc(collection(db, 'lessons'), lessonData);
+		const lessonRef = await addDoc(collection(db, 'lesson'), lessonData);
 
 		// Update module to include this lesson
 		const moduleLessons = moduleDoc.data().lessons || [];
@@ -63,7 +63,7 @@ export async function GET(request) {
 		let snapshot;
 		try {
 			const lessonsQuery = query(
-				collection(db, 'lessons'),
+				collection(db, 'lesson'),
 				where('moduleId', '==', moduleId),
 				orderBy('order', 'asc')
 			);
@@ -73,7 +73,7 @@ export async function GET(request) {
 			if (err.code === 'failed-precondition' || err.message?.includes('index')) {
 				console.warn('Firestore index may be missing, using fallback query');
 				const fallbackQuery = query(
-					collection(db, 'lessons'),
+					collection(db, 'lesson'),
 					where('moduleId', '==', moduleId)
 				);
 				snapshot = await getDocs(fallbackQuery);

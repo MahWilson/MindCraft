@@ -26,7 +26,7 @@ export default function AdminCoursesPage() {
 				}
 
 				// Get user role from Firestore
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (!userDoc.exists()) {
 					setLoading(false);
 					return;
@@ -63,12 +63,12 @@ export default function AdminCoursesPage() {
 			if (currentRole === 'admin') {
 				// Admin sees all courses
 				draftsQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'draft'),
 					orderBy('createdAt', 'desc')
 				);
 				publishedQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'published'),
 					orderBy('createdAt', 'desc')
 				);
@@ -79,13 +79,13 @@ export default function AdminCoursesPage() {
 					return;
 				}
 				draftsQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'draft'),
 					where('createdBy', '==', currentUserId),
 					orderBy('createdAt', 'desc')
 				);
 				publishedQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'published'),
 					where('createdBy', '==', currentUserId),
 					orderBy('createdAt', 'desc')
@@ -113,12 +113,12 @@ export default function AdminCoursesPage() {
 			// If there's an error (like missing index), try without orderBy
 			try {
 				if (currentRole === 'admin') {
-					const allDocs = await getDocs(collection(db, 'courses'));
+					const allDocs = await getDocs(collection(db, 'course'));
 					const all = allDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 					setDraftCourses(all.filter(c => c.status === 'draft'));
 					setPublishedCourses(all.filter(c => c.status === 'published'));
 				} else if (currentUserId) {
-					const allDocs = await getDocs(collection(db, 'courses'));
+					const allDocs = await getDocs(collection(db, 'course'));
 					const all = allDocs.docs
 						.map(doc => ({ id: doc.id, ...doc.data() }))
 						.filter(c => c.createdBy === currentUserId);

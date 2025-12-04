@@ -3,8 +3,16 @@
 import Link from 'next/link';
 import SignOutButton from '@/app/components/SignOutButton';
 import { Button } from './ui/button';
+import { useLanguage } from '@/app/contexts/LanguageContext';
+import { Languages } from 'lucide-react';
 
 export default function Header({ role }) {
+	const { language, setLanguage } = useLanguage();
+
+	const toggleLanguage = () => {
+		setLanguage(language === 'en' ? 'bm' : 'en');
+	};
+
 	return (
 		<header className="sticky top-0 z-40 bg-white border-b border-border shadow-sm relative w-full">
 			{/* Single Unified Container - spans full width, 3x height */}
@@ -16,6 +24,20 @@ export default function Header({ role }) {
 					
 					{/* User Actions - always on the right */}
 					<div className="flex items-center gap-3 flex-shrink-0">
+						{role !== 'guest' && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={toggleLanguage}
+								className="flex items-center gap-2"
+								title={language === 'en' ? 'Switch to Bahasa Melayu' : 'Tukar ke English'}
+							>
+								<Languages className="h-4 w-4" />
+								<span className="hidden sm:inline text-caption font-medium">
+									{language === 'en' ? 'EN' : 'BM'}
+								</span>
+							</Button>
+						)}
 						{role === 'guest' ? (
 							<Link href="/login">
 								<Button variant="default" size="sm">

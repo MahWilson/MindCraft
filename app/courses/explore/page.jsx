@@ -31,7 +31,7 @@ export default function ExploreCoursesPage() {
 			try {
 				// Only load published courses for exploration
 				const coursesQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'published'),
 					orderBy('createdAt', 'desc')
 				);

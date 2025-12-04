@@ -20,11 +20,11 @@ export async function POST(request) {
 			updatedAt: serverTimestamp(),
 		};
 
-		const moduleRef = await addDoc(collection(db, 'modules'), moduleData);
+		const moduleRef = await addDoc(collection(db, 'module'), moduleData);
 
 		// If courseId is provided, link the module to the course
 		if (courseId) {
-			const courseRef = doc(db, 'courses', courseId);
+			const courseRef = doc(db, 'course', courseId);
 			const courseDoc = await getDoc(courseRef);
 
 			if (courseDoc.exists()) {
@@ -54,7 +54,7 @@ export async function GET(request) {
 
 		if (courseId) {
 			// Get modules linked to a specific course
-			const courseRef = doc(db, 'courses', courseId);
+			const courseRef = doc(db, 'course', courseId);
 			const courseDoc = await getDoc(courseRef);
 
 			if (!courseDoc.exists()) {
@@ -70,7 +70,7 @@ export async function GET(request) {
 			// Fetch module details
 			const modules = [];
 			for (const moduleId of moduleIds) {
-				const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+				const moduleDoc = await getDoc(doc(db, 'module', moduleId));
 				if (moduleDoc.exists()) {
 					modules.push({
 						id: moduleDoc.id,
@@ -86,7 +86,7 @@ export async function GET(request) {
 		} else {
 			// Get all modules (for module library)
 			const modulesQuery = query(
-				collection(db, 'modules'),
+				collection(db, 'module'),
 				orderBy('createdAt', 'desc')
 			);
 

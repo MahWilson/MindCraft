@@ -48,7 +48,7 @@ export default function ModuleDetailPage() {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
 				setCurrentUserId(user.uid);
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setUserRole(userDoc.data().role);
 				}
@@ -65,7 +65,7 @@ export default function ModuleDetailPage() {
 		setLoading(true);
 		try {
 			// Load module
-			const moduleDoc = await getDoc(doc(db, 'modules', moduleId));
+			const moduleDoc = await getDoc(doc(db, 'module', moduleId));
 			if (!moduleDoc.exists()) {
 				setError('Module not found');
 				setLoading(false);
@@ -88,7 +88,7 @@ export default function ModuleDetailPage() {
 						const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore');
 						try {
 							const lessonsQuery = query(
-								collection(db, 'lessons'),
+								collection(db, 'lesson'),
 								where('moduleId', '==', moduleId)
 							);
 							const snapshot = await getDocs(lessonsQuery);
@@ -129,7 +129,7 @@ export default function ModuleDetailPage() {
 
 		setSubmitting(true);
 		try {
-			await updateDoc(doc(db, 'modules', moduleId), {
+			await updateDoc(doc(db, 'module', moduleId), {
 				title: newTitle.trim(),
 				updatedAt: serverTimestamp(),
 			});
@@ -167,12 +167,12 @@ export default function ModuleDetailPage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			const lessonRef = await addDoc(collection(db, 'lessons'), lessonData);
+			const lessonRef = await addDoc(collection(db, 'lesson'), lessonData);
 
 			// Update module to include this lesson
 			const moduleLessons = module?.lessons || [];
 			if (!moduleLessons.includes(lessonRef.id)) {
-				await updateDoc(doc(db, 'modules', moduleId), {
+				await updateDoc(doc(db, 'module', moduleId), {
 					lessons: [...moduleLessons, lessonRef.id],
 					updatedAt: serverTimestamp(),
 				});
@@ -426,7 +426,7 @@ export default function ModuleDetailPage() {
 
 		setSubmitting(true);
 		try {
-			const lessonRef = doc(db, 'lessons', lessonId);
+			const lessonRef = doc(db, 'lesson', lessonId);
 			await updateDoc(lessonRef, {
 				title: editLessonTitle.trim(),
 				contentHtml: editLessonContent || '',

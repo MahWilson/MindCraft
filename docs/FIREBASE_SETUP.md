@@ -4,15 +4,15 @@
 
 - **Firebase Auth**: Email/Password authentication enabled
 - **Firestore**: Database created with Security Rules configured
-- **Collections**: `users`, `courses`
+- **Collections**: `user`, `course`
 
 ## Data Model
 
-### Users Collection
+### User Collection
 - Document ID: User UID (from Firebase Auth)
 - Fields: `name`, `email`, `role` (admin/teacher/student), `status`, `createdAt`
 
-### Courses Collection
+### Course Collection
 - Document ID: Auto-generated
 - Fields: `title`, `description`, `status` (draft/published), `modules[]`, `createdBy`, `authorName`, `authorEmail`, `createdAt`, `updatedAt`
 
@@ -93,6 +93,6 @@ If you prefer to share the `.env` file directly:
 
 ### Authentication
 - Firebase Auth persists across page refreshes
-- User role is fetched from Firestore `users` collection
+- User role is fetched from Firestore `user` collection
 - Sign out clears Firebase Auth session and cookies
 

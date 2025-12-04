@@ -45,7 +45,7 @@ export default function SubmitAssignmentPage() {
 		setLoading(true);
 		try {
 			// Load assessment
-			const assessmentDoc = await getDoc(doc(db, 'assessments', assessmentId));
+			const assessmentDoc = await getDoc(doc(db, 'assessment', assessmentId));
 			if (!assessmentDoc.exists()) {
 				setError('Assessment not found');
 				setLoading(false);
@@ -65,7 +65,7 @@ export default function SubmitAssignmentPage() {
 			// Load existing submission if any
 			if (currentUserId) {
 				const submissionsQuery = query(
-					collection(db, 'submissions'),
+					collection(db, 'submission'),
 					where('assessmentId', '==', assessmentId),
 					where('studentId', '==', currentUserId)
 				);
@@ -199,11 +199,11 @@ export default function SubmitAssignmentPage() {
 
 			if (submission) {
 				// Update existing submission
-				await updateDoc(doc(db, 'submissions', submission.id), submissionData);
+				await updateDoc(doc(db, 'submission', submission.id), submissionData);
 				setSuccessMessage('Assignment updated successfully!');
 			} else {
 				// Create new submission
-				await addDoc(collection(db, 'submissions'), submissionData);
+				await addDoc(collection(db, 'submission'), submissionData);
 				setSuccessMessage('Assignment submitted successfully!');
 			}
 

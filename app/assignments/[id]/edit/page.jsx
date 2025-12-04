@@ -39,7 +39,7 @@ export default function EditAssignmentPage() {
 			if (user) {
 				setCurrentUserId(user.uid);
 				const { doc, getDoc } = await import('firebase/firestore');
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					const role = userDoc.data().role;
 					setUserRole(role);
@@ -65,7 +65,7 @@ export default function EditAssignmentPage() {
 		setLoading(true);
 		try {
 			// Load courses
-			const coursesQuery = query(collection(db, 'courses'));
+			const coursesQuery = query(collection(db, 'course'));
 			const coursesSnapshot = await getDocs(coursesQuery);
 			const loadedCourses = coursesSnapshot.docs.map(doc => ({
 				id: doc.id,
@@ -74,7 +74,7 @@ export default function EditAssignmentPage() {
 			setCourses(loadedCourses);
 
 			// Load assignment
-			const assignmentDoc = await getDoc(doc(db, 'assignments', assignmentId));
+			const assignmentDoc = await getDoc(doc(db, 'assignment', assignmentId));
 			if (!assignmentDoc.exists()) {
 				setError('Assignment not found');
 				setLoading(false);
@@ -170,7 +170,7 @@ export default function EditAssignmentPage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			await updateDoc(doc(db, 'assignments', assignmentId), assignmentData);
+			await updateDoc(doc(db, 'assignment', assignmentId), assignmentData);
 
 			router.push('/assignments');
 		} catch (err) {
@@ -190,7 +190,7 @@ export default function EditAssignmentPage() {
 
 		try {
 			const { deleteDoc } = await import('firebase/firestore');
-			await deleteDoc(doc(db, 'assignments', assignmentId));
+			await deleteDoc(doc(db, 'assignment', assignmentId));
 			router.push('/assignments');
 		} catch (err) {
 			console.error('Error deleting assignment:', err);

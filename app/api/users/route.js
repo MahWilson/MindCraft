@@ -14,7 +14,7 @@ export async function GET() {
 			return NextResponse.json({ error: 'Unauthorized: Only admins can view all users' }, { status: 403 });
 		}
 
-		const usersSnapshot = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
+		const usersSnapshot = await getDocs(query(collection(db, 'user'), orderBy('createdAt', 'desc')));
 		const users = usersSnapshot.docs.map(doc => ({
 			id: doc.id,
 			...doc.data(),

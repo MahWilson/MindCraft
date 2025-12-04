@@ -34,7 +34,7 @@ export default function EditCoursePage() {
 				}
 
 				// Get user role from Firestore
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (!userDoc.exists()) {
 					setError('User profile not found');
 					setLoading(false);
@@ -46,7 +46,7 @@ export default function EditCoursePage() {
 				const currentUserId = user.uid;
 
 				// Fetch course
-				const courseDoc = await getDoc(doc(db, 'courses', courseId));
+				const courseDoc = await getDoc(doc(db, 'course', courseId));
 				
 				if (!courseDoc.exists()) {
 					setError('Course not found');
@@ -96,7 +96,7 @@ export default function EditCoursePage() {
 		setSuccess('');
 
 		try {
-			await updateDoc(doc(db, 'courses', courseId), {
+			await updateDoc(doc(db, 'course', courseId), {
 				title: title.trim(),
 				description: description?.trim() || '',
 				status: status,

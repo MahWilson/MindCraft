@@ -22,7 +22,7 @@ export default function AssessmentsPage() {
 			if (user) {
 				setCurrentUserId(user.uid);
 				const { doc, getDoc } = await import('firebase/firestore');
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setUserRole(userDoc.data().role);
 				}
@@ -37,10 +37,10 @@ export default function AssessmentsPage() {
 	}, [router]);
 
 	useEffect(() => {
-		if (userRole) {
+		if (userRole && currentUserId) {
 			loadAssessments();
 		}
-	}, [userRole]);
+	}, [userRole, currentUserId]);
 
 	async function loadAssessments() {
 		setLoading(true);
@@ -48,27 +48,59 @@ export default function AssessmentsPage() {
 			let assessmentsQuery;
 			
 			if (userRole === 'student') {
-				// Students see only published assessments
+				// First, get all published assessments
+				// Note: We query without orderBy first to avoid index issues, then sort client-side
 				assessmentsQuery = query(
-					collection(db, 'assessments'),
-					where('published', '==', true),
-					orderBy('createdAt', 'desc')
+					collection(db, 'assessment'),
+					where('published', '==', true)
 				);
+				
+				const snapshot = await getDocs(assessmentsQuery);
+				const allAssessments = snapshot.docs.map(doc => ({
+					id: doc.id,
+					...doc.data(),
+				})).sort((a, b) => {
+					// Sort by createdAt if available, otherwise by id
+					const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+					const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+					return bTime - aTime;
+				});
+
+				// Then, filter by enrollment - only show assessments for courses the student is enrolled in
+				if (currentUserId) {
+					const enrollmentsQuery = query(
+						collection(db, 'enrollment'),
+						where('studentId', '==', currentUserId)
+					);
+					const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+					const enrolledCourseIds = new Set(
+						enrollmentsSnapshot.docs.map(doc => doc.data().courseId)
+					);
+
+					// Filter assessments to only those for enrolled courses
+					const filteredAssessments = allAssessments.filter(assessment => 
+						assessment.courseId && enrolledCourseIds.has(assessment.courseId)
+					);
+
+					setAssessments(filteredAssessments);
+				} else {
+					setAssessments([]);
+				}
 			} else {
 				// Teachers and admins see all assessments
 				assessmentsQuery = query(
-					collection(db, 'assessments'),
+					collection(db, 'assessment'),
 					orderBy('createdAt', 'desc')
 				);
+
+				const snapshot = await getDocs(assessmentsQuery);
+				const loadedAssessments = snapshot.docs.map(doc => ({
+					id: doc.id,
+					...doc.data(),
+				}));
+
+				setAssessments(loadedAssessments);
 			}
-
-			const snapshot = await getDocs(assessmentsQuery);
-			const loadedAssessments = snapshot.docs.map(doc => ({
-				id: doc.id,
-				...doc.data(),
-			}));
-
-			setAssessments(loadedAssessments);
 		} catch (err) {
 			console.error('Error loading assessments:', err);
 		} finally {
@@ -114,7 +146,7 @@ export default function AssessmentsPage() {
 		}
 
 		try {
-			await deleteDoc(doc(db, 'assessments', assessmentId));
+			await deleteDoc(doc(db, 'assessment', assessmentId));
 			setAssessments(prev => prev.filter(a => a.id !== assessmentId));
 		} catch (err) {
 			console.error('Error deleting assessment:', err);
@@ -124,7 +156,7 @@ export default function AssessmentsPage() {
 
 	async function togglePublish(assessment) {
 		try {
-			await updateDoc(doc(db, 'assessments', assessment.id), {
+			await updateDoc(doc(db, 'assessment', assessment.id), {
 				published: !assessment.published,
 				updatedAt: new Date(),
 			});
@@ -252,8 +284,13 @@ export default function AssessmentsPage() {
 
 									<div className="flex flex-wrap gap-2 pt-2 border-t">
 										{userRole === 'student' ? (
-											<Link href={`/assessments/${assessment.id}/submit`} className="flex-1 min-w-[100px]">
-												<Button variant="default" className="w-full" title="Submit Assignment">
+											<Link 
+												href={assessment.type === 'assignment' 
+													? `/assessments/${assessment.id}/submit` 
+													: `/assessments/${assessment.id}/take`} 
+												className="flex-1 min-w-[100px]"
+											>
+												<Button variant="default" className="w-full" title={assessment.type === 'assignment' ? 'Submit Assignment' : 'Take Assessment'}>
 													{assessment.type === 'assignment' ? (
 														<>
 															<Upload className="h-5 w-5 mr-2" />

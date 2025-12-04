@@ -2,11 +2,14 @@
   "name": "mindcraft",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate:rename-collections": "node scripts/rename-collections.js",
+    "migrate:rename-collections:delete": "node scripts/rename-collections.js --delete-old"
   },
   "dependencies": {
     "@tremor/react": "^3.18.7",

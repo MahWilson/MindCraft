@@ -24,7 +24,7 @@ export default function CourseManagement({ course, currentUserId, currentRole })
 		setLoading(true);
 		setError('');
 		try {
-			await deleteDoc(doc(db, 'courses', course.id));
+			await deleteDoc(doc(db, 'course', course.id));
 			// Force page reload to refresh the courses list
 			window.location.reload();
 		} catch (err) {
@@ -38,7 +38,7 @@ export default function CourseManagement({ course, currentUserId, currentRole })
 		setLoading(true);
 		setError('');
 		try {
-			await updateDoc(doc(db, 'courses', course.id), {
+			await updateDoc(doc(db, 'course', course.id), {
 				status: 'published',
 				updatedAt: serverTimestamp(),
 			});
@@ -58,7 +58,7 @@ export default function CourseManagement({ course, currentUserId, currentRole })
 		setLoading(true);
 		setError('');
 		try {
-			await updateDoc(doc(db, 'courses', course.id), {
+			await updateDoc(doc(db, 'course', course.id), {
 				status: 'draft',
 				updatedAt: serverTimestamp(),
 			});

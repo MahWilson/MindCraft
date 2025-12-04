@@ -22,7 +22,7 @@ export default function AssignmentsPage() {
 			if (user) {
 				setCurrentUserId(user.uid);
 				const { doc, getDoc } = await import('firebase/firestore');
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setUserRole(userDoc.data().role);
 				}
@@ -49,7 +49,7 @@ export default function AssignmentsPage() {
 		setLoading(true);
 		try {
 			const assignmentsQuery = query(
-				collection(db, 'assignments'),
+				collection(db, 'assignment'),
 				orderBy('createdAt', 'desc')
 			);
 
@@ -73,7 +73,7 @@ export default function AssignmentsPage() {
 		}
 
 		try {
-			await deleteDoc(doc(db, 'assignments', assignmentId));
+			await deleteDoc(doc(db, 'assignment', assignmentId));
 			setAssignments(prev => prev.filter(a => a.id !== assignmentId));
 		} catch (err) {
 			console.error('Error deleting assignment:', err);
@@ -83,7 +83,7 @@ export default function AssignmentsPage() {
 
 	async function togglePublish(assignment) {
 		try {
-			await updateDoc(doc(db, 'assignments', assignment.id), {
+			await updateDoc(doc(db, 'assignment', assignment.id), {
 				status: assignment.status === 'published' ? 'draft' : 'published',
 				updatedAt: new Date(),
 			});
@@ -96,7 +96,7 @@ export default function AssignmentsPage() {
 
 	async function toggleOpen(assignment) {
 		try {
-			await updateDoc(doc(db, 'assignments', assignment.id), {
+			await updateDoc(doc(db, 'assignment', assignment.id), {
 				isOpen: !assignment.isOpen,
 				updatedAt: new Date(),
 			});

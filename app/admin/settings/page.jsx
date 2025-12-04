@@ -26,7 +26,7 @@ export default function AdminSettingsPage() {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
 				const { doc, getDoc } = await import('firebase/firestore');
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					const role = userDoc.data().role;
 					setUserRole(role);
@@ -46,7 +46,7 @@ export default function AdminSettingsPage() {
 
 	async function loadSettings() {
 		try {
-			const settingsDoc = await getDoc(doc(db, 'settings', 'app'));
+			const settingsDoc = await getDoc(doc(db, 'setting', 'app'));
 			if (settingsDoc.exists()) {
 				const data = settingsDoc.data();
 				setLogoUrl(data.logoUrl || '');
@@ -114,7 +114,7 @@ export default function AdminSettingsPage() {
 		setError('');
 
 		try {
-			await setDoc(doc(db, 'settings', 'app'), {
+			await setDoc(doc(db, 'setting', 'app'), {
 				logoUrl,
 				updatedAt: new Date(),
 				updatedBy: auth.currentUser.uid,

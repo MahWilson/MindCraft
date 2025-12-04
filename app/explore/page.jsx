@@ -16,7 +16,7 @@ export default function ExplorePage() {
 			try {
 				// Only show published courses for guests
 				const coursesQuery = query(
-					collection(db, 'courses'),
+					collection(db, 'course'),
 					where('status', '==', 'published'),
 					orderBy('createdAt', 'desc')
 				);

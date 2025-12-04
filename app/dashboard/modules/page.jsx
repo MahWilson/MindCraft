@@ -25,7 +25,7 @@ export default function ModulesPage() {
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					const userRole = userDoc.data().role;
 					setRole(userRole);
@@ -51,7 +51,7 @@ export default function ModulesPage() {
 		try {
 			// Load modules directly from Firestore (client-side with Firebase Auth)
 			const modulesQuery = query(
-				collection(db, 'modules'),
+				collection(db, 'module'),
 				orderBy('createdAt', 'desc')
 			);
 
@@ -70,7 +70,7 @@ export default function ModulesPage() {
 					try {
 						const { collection, query, where, getDocs } = await import('firebase/firestore');
 						const lessonsQuery = query(
-							collection(db, 'lessons'),
+							collection(db, 'lesson'),
 							where('moduleId', '==', module.id)
 						);
 						const lessonsSnapshot = await getDocs(lessonsQuery);
@@ -100,7 +100,7 @@ export default function ModulesPage() {
 			if (err.code === 'failed-precondition' || err.message?.includes('index')) {
 				try {
 					console.log('Retrying without orderBy...');
-					const snapshot = await getDocs(collection(db, 'modules'));
+					const snapshot = await getDocs(collection(db, 'module'));
 					const loadedModules = snapshot.docs.map(doc => ({
 						id: doc.id,
 						...doc.data(),
@@ -120,7 +120,7 @@ export default function ModulesPage() {
 							try {
 								const { collection, query, where, getDocs } = await import('firebase/firestore');
 								const lessonsQuery = query(
-									collection(db, 'lessons'),
+									collection(db, 'lesson'),
 									where('moduleId', '==', module.id)
 								);
 								const lessonsSnapshot = await getDocs(lessonsQuery);
@@ -168,7 +168,7 @@ export default function ModulesPage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			await addDoc(collection(db, 'modules'), moduleData);
+			await addDoc(collection(db, 'module'), moduleData);
 
 			// Reload modules
 			await loadModules();

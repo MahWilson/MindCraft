@@ -13,7 +13,7 @@ export async function POST(request, { params }) {
 		}
 
 		// Verify course exists
-		const courseRef = doc(db, 'courses', courseId);
+		const courseRef = doc(db, 'course', courseId);
 		const courseDoc = await getDoc(courseRef);
 
 		if (!courseDoc.exists()) {
@@ -21,7 +21,7 @@ export async function POST(request, { params }) {
 		}
 
 		// Verify module exists
-		const moduleRef = doc(db, 'modules', moduleId);
+		const moduleRef = doc(db, 'module', moduleId);
 		const moduleDoc = await getDoc(moduleRef);
 
 		if (!moduleDoc.exists()) {
@@ -56,7 +56,7 @@ export async function DELETE(request, { params }) {
 		}
 
 		// Verify course exists
-		const courseRef = doc(db, 'courses', courseId);
+		const courseRef = doc(db, 'course', courseId);
 		const courseDoc = await getDoc(courseRef);
 
 		if (!courseDoc.exists()) {

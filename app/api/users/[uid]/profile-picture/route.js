@@ -23,7 +23,7 @@ export async function PUT(request, { params }) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 		}
 
-		await updateDoc(doc(db, 'users', uid), {
+		await updateDoc(doc(db, 'user', uid), {
 			profilePicture: profilePictureUrl,
 		});
 

@@ -26,7 +26,7 @@ export default function NewCoursePage() {
 		// Get user role on mount
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			if (user) {
-				const userDoc = await getDoc(doc(db, 'users', user.uid));
+				const userDoc = await getDoc(doc(db, 'user', user.uid));
 				if (userDoc.exists()) {
 					setUserRole(userDoc.data().role);
 				}
@@ -51,7 +51,7 @@ export default function NewCoursePage() {
 
 		try {
 			// Get user profile to get name and role
-			const userDoc = await getDoc(doc(db, 'users', user.uid));
+			const userDoc = await getDoc(doc(db, 'user', user.uid));
 			const userData = userDoc.exists() ? userDoc.data() : null;
 			
 			if (!userData || (userData.role !== 'admin' && userData.role !== 'teacher')) {
@@ -73,7 +73,7 @@ export default function NewCoursePage() {
 				updatedAt: serverTimestamp(),
 			};
 
-			const docRef = await addDoc(collection(db, 'courses'), courseData);
+			const docRef = await addDoc(collection(db, 'course'), courseData);
 			const newCourseId = docRef.id;
 			
 			// Save modules if any were created
@@ -89,10 +89,10 @@ export default function NewCoursePage() {
 							updatedAt: serverTimestamp(),
 						};
 
-						const moduleRef = await addDoc(collection(db, 'modules'), moduleData);
+						const moduleRef = await addDoc(collection(db, 'module'), moduleData);
 
 						// Link module to course
-						const courseRef = doc(db, 'courses', newCourseId);
+						const courseRef = doc(db, 'course', newCourseId);
 						const courseDoc = await getDoc(courseRef);
 						if (courseDoc.exists()) {
 							const courseModules = courseDoc.data().modules || [];
@@ -119,16 +119,16 @@ export default function NewCoursePage() {
 										updatedAt: serverTimestamp(),
 									};
 
-									const lessonRef = await addDoc(collection(db, 'lessons'), lessonData);
+									const lessonRef = await addDoc(collection(db, 'lesson'), lessonData);
 
 									// Update module to include this lesson
 									const moduleLessons = [];
 									if (moduleRef.id) {
-										const moduleDoc = await getDoc(doc(db, 'modules', moduleRef.id));
+										const moduleDoc = await getDoc(doc(db, 'module', moduleRef.id));
 										if (moduleDoc.exists()) {
 											const existingLessons = moduleDoc.data().lessons || [];
 											if (!existingLessons.includes(lessonRef.id)) {
-												await updateDoc(doc(db, 'modules', moduleRef.id), {
+												await updateDoc(doc(db, 'module', moduleRef.id), {
 													lessons: [...existingLessons, lessonRef.id],
 													updatedAt: serverTimestamp(),
 												});

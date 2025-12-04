@@ -48,18 +48,18 @@
 
 ### Firestore collections (core)
 
-* `users` `{ uid, name, email, role: "admin|teacher|student", profilePic, class, createdAt, status }`
-* `courses` `{ id, title, description, status: "draft|published", modules: [moduleIds], createdBy, createdAt, updatedAt }`
-* `modules` `{ id, courseId, title, order, lessons: [lessonIds] }`
-* `lessons` `{ id, moduleId, title, contentHtml, materials: [storageUrls], aiGenerated: bool, updatedAt }`
-* `assessments` `{ id, courseId, title, type: "quiz|coding|assignment", questions: [...], config: {start,end,timer,attempts}, published }`
-* `submissions` `{ id, assessmentId, studentId, files:[url], answers: {...}, grade, feedback, status, submittedAt }`
+* `user` `{ uid, name, email, role: "admin|teacher|student", profilePic, class, createdAt, status }`
+* `course` `{ id, title, description, status: "draft|published", modules: [moduleIds], createdBy, createdAt, updatedAt }`
+* `module` `{ id, courseId, title, order, lessons: [lessonIds] }`
+* `lesson` `{ id, moduleId, title, contentHtml, materials: [storageUrls], aiGenerated: bool, updatedAt }`
+* `assessment` `{ id, courseId, title, type: "quiz|coding|assignment", questions: [...], config: {start,end,timer,attempts}, published }`
+* `submission` `{ id, assessmentId, studentId, files:[url], answers: {...}, grade, feedback, status, submittedAt }`
 * `progress` (or derive on the fly) `{ studentId, courseId, metrics: {...} }`
 * `forum` `{ id, courseId, authorId, content, replies, pinned, deleted }`
 
 ### Minimal API routes (Next.js API)
 
-* `POST /api/courses` — create course (teacher). Payload `{title, description, modules?}`. Server writes `courses`.
+* `POST /api/courses` — create course (teacher). Payload `{title, description, modules?}`. Server writes `course`.
 * `PUT /api/courses/:id` — edit course + reorder modules.
 * `GET /api/courses` — list courses (filter: published/draft).
 * `POST /api/lessons` — create/update lesson. Save `contentHtml` and materials.

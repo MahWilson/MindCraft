@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 		}
 
-		const userDoc = await getDoc(doc(db, 'users', uid));
+		const userDoc = await getDoc(doc(db, 'user', uid));
 		if (!userDoc.exists()) {
 			return NextResponse.json({ error: 'User not found' }, { status: 404 });
 		}
@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
 		if (name !== undefined) updateData.name = name.trim();
 		if (email !== undefined) updateData.email = email.trim();
 
-		await updateDoc(doc(db, 'users', uid), updateData);
+		await updateDoc(doc(db, 'user', uid), updateData);
 
 		return NextResponse.json({ success: true, message: 'User updated successfully' });
 	} catch (error) {
@@ -81,7 +81,7 @@ export async function DELETE(request, { params }) {
 		}
 
 		// Delete user document from Firestore
-		await deleteDoc(doc(db, 'users', uid));
+		await deleteDoc(doc(db, 'user', uid));
 
 		return NextResponse.json({ success: true, message: 'User account deleted successfully' });
 	} catch (error) {
