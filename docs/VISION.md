@@ -22,7 +22,27 @@ MindCraft is a lightweight web learning platform for secondary school programmin
 - Offline-first for learning materials; small client bundle; accessible UI
 
 ## Firestore (core collections)
-- `user`, `course`, `module`, `lesson`, `assessment`, `submission`, `progress`, `forum`
+
+**⚠️ IMPORTANT: Use SINGULAR collection names only**
+
+All Firestore collections use **singular** naming convention:
+- `user` (NOT `users`)
+- `course` (NOT `courses`)
+- `module` (NOT `modules`)
+- `lesson` (NOT `lessons`)
+- `assessment` (NOT `assessments`)
+- `assignment` (NOT `assignments`)
+- `submission` (NOT `submissions`)
+- `enrollment` (NOT `enrollments`)
+- `progress` (NOT `progresses`)
+- `forum` (NOT `forums`)
+- `setting` (NOT `settings`)
+
+**For AI Agents/Developers:**
+- Always use singular collection names when creating new collections or referencing existing ones
+- Do NOT create plural versions - they are deprecated
+- Check `docs/FIRESTORE_SECURITY_RULES.md` for current collection names
+- Migration from plural to singular has been completed - do not revert
 
 ## Acceptance (Sprint 1)
 - Teacher can create course (draft/published), persisted with timestamps and createdBy

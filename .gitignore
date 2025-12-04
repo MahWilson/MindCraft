@@ -32,3 +32,23 @@ coverage/
 # Misc
 *.local
 
+# Merge guides and analysis (internal use only)
+MERGE_*.md
+BRANCH_ANALYSIS.json
+CHECK_GIT_PATH.md
+GIT_SETUP_GUIDE.md
+PULL_INSTRUCTIONS.md
+
+# Migration scripts (internal use only)
+scripts/rename-collections.js
+scripts/analyze-branches.js
+scripts/safe-extract.js
+docs/COLLECTION_RENAME_MIGRATION.md
+
+# Internal documentation (not for team members)
+docs/AI_FEATURES_CODE_SNIPPETS.md
+docs/FIREBASE_BILLING_PRECAUTIONS.md
+docs/FIREBASE_STORAGE_RULES_COLLABORATIVE.md
+docs/FIREBASE_STORAGE_RULES_STRICT.md
+docs/FIREBASE_STORAGE_SETUP.md
+
