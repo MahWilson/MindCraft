@@ -8,7 +8,7 @@ import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Download, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LessonPage() {
@@ -23,6 +23,18 @@ export default function LessonPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [currentLessonIndex, setCurrentLessonIndex] = useState(-1);
+	const [user, setUser] = useState(null);
+	const [downloadStatus, setDownloadStatus] = useState({});
+	const [downloadMessage, setDownloadMessage] = useState('');
+
+	useEffect(() => {
+		// this checks who is signed in
+		const unsubscribe = onAuthStateChanged(auth, currentUser => {
+			setUser(currentUser);
+		});
+
+		return () => unsubscribe();
+	}, []);
 
 	useEffect(() => {
 		async function loadLesson() {
@@ -80,6 +92,59 @@ export default function LessonPage() {
 	const prevLesson = currentLessonIndex > 0 
 		? allLessons[currentLessonIndex - 1] 
 		: null;
+
+	// this is for file size text
+	function formatFileSize(bytes) {
+		if (!bytes && bytes !== 0) return '';
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	// this is for downloading
+	async function handleDownload(material) {
+		if (!user) {
+			setDownloadMessage('Sign in to download files.');
+			return;
+		}
+
+		setDownloadMessage('');
+		setDownloadStatus(prev => ({ ...prev, [material.id]: 'checking' }));
+
+		try {
+			const response = await fetch(material.url);
+			if (!response.ok) {
+				throw new Error('Download blocked or missing.');
+			}
+
+			const blob = await response.blob();
+
+			// simple integrity check
+			if (!blob.size) {
+				throw new Error('File looks empty, try again.');
+			}
+
+			if (material.type && blob.type && material.type !== blob.type) {
+				console.warn('File type mismatch', { expected: material.type, got: blob.type });
+			}
+
+			const objectUrl = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = objectUrl;
+			link.download = material.name || 'lesson-material';
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			URL.revokeObjectURL(objectUrl);
+
+			setDownloadStatus(prev => ({ ...prev, [material.id]: 'done' }));
+			setDownloadMessage('Download checked and saved.');
+		} catch (err) {
+			console.error('Error downloading file:', err);
+			setDownloadStatus(prev => ({ ...prev, [material.id]: 'error' }));
+			setDownloadMessage(err.message || 'Download failed.');
+		}
+	}
 
 	if (loading) {
 		return (
@@ -145,6 +210,58 @@ export default function LessonPage() {
 						/>
 					) : (
 						<p className="text-body text-muted-foreground">No content available for this lesson yet.</p>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Lesson Materials */}
+			<Card>
+				<CardHeader className="flex flex-col gap-1">
+					<CardTitle className="text-h4 flex items-center gap-2">
+						<Download className="h-5 w-5" />
+						Lesson materials
+					</CardTitle>
+					<p className="text-caption text-muted-foreground flex items-center gap-1">
+						<ShieldCheck className="h-4 w-4" />
+						Files stay private to signed-in students.
+					</p>
+					{downloadMessage && (
+						<p className="text-caption text-emerald-600">{downloadMessage}</p>
+					)}
+				</CardHeader>
+				<CardContent className="space-y-3">
+					{lesson.materials && lesson.materials.length > 0 ? (
+						lesson.materials.map(material => (
+							<div
+								key={material.id || material.url}
+								className="flex items-center justify-between rounded-md border border-border bg-muted/40 p-3"
+							>
+								<div className="space-y-1">
+									<p className="text-body font-medium text-neutralDark">{material.name || 'Lesson file'}</p>
+									<p className="text-caption text-muted-foreground">
+										{material.type || 'file'} {material.size ? `• ${formatFileSize(material.size)}` : ''}
+									</p>
+									{downloadStatus[material.id] === 'done' && (
+										<p className="text-caption text-emerald-600">Checked and downloaded.</p>
+									)}
+									{downloadStatus[material.id] === 'error' && (
+										<p className="text-caption text-error">Download failed, try again.</p>
+									)}
+									{!user && (
+										<p className="text-caption text-amber-600">Sign in to download.</p>
+									)}
+								</div>
+								<Button
+									variant="outline"
+									onClick={() => handleDownload(material)}
+									disabled={!user || downloadStatus[material.id] === 'checking'}
+								>
+									{downloadStatus[material.id] === 'checking' ? 'Checking...' : 'Download'}
+								</Button>
+							</div>
+						))
+					) : (
+						<p className="text-body text-muted-foreground">No files shared yet.</p>
 					)}
 				</CardContent>
 			</Card>
