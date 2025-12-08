@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { FileText, BookOpen, ClipboardCheck, Brain, ArrowRight, Joystick } from 'lucide-react';
+import { FileText, BookOpen, ClipboardCheck, Brain, ArrowRight } from 'lucide-react';
 import { Metric, Flex, Text } from '@tremor/react';
 
 export default function TeacherDashboard() {
@@ -145,27 +145,6 @@ export default function TeacherDashboard() {
 						</CardContent>
 					</Card>
 
-					<Card className="card-hover">
-						<CardHeader>
-							<Flex justifyContent="start" className="gap-3">
-								<div className="p-2 bg-primary/10 rounded-lg">
-									<Joystick className="h-6 w-6 text-primary" />
-								</div>
-								<div>
-									<CardTitle>Game Levels</CardTitle>
-									<CardDescription>Build visual challenges</CardDescription>
-								</div>
-							</Flex>
-						</CardHeader>
-						<CardContent>
-							<Link href="/dashboard/teacher/game-levels">
-								<Button variant="ghost" className="w-full justify-between group">
-									Open Builder
-									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
-								</Button>
-							</Link>
-						</CardContent>
-					</Card>
 				</div>
 			</div>
 		</div>
