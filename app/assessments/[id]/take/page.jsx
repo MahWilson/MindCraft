@@ -548,12 +548,43 @@ export default function TakeAssessmentPage() {
 									<div className="border rounded p-3 bg-white flex-1">
 										<p className="font-semibold text-body">Table A</p>
 										<p className="text-muted-foreground text-sm">{assessment.gameLevel?.tableA || 'tableA'}</p>
-										<div className="mt-1 flex flex-wrap gap-1">
-											{(assessment.gameLevel?.columns || '').split(',').map((col, idx) => (
-												<span key={idx} className="text-caption px-2 py-1 rounded bg-muted text-neutralDark border">
-													{col.trim()}
-												</span>
-											))}
+										<div className="mt-2 space-y-2">
+											<p className="text-caption text-muted-foreground">Teacher selected columns</p>
+											{(() => {
+												const cols = (assessment.gameLevel?.columns || '')
+													.split(',')
+													.map(col => col.trim())
+													.filter(Boolean);
+
+												if (cols.length === 0) {
+													return <p className="text-caption text-muted-foreground">No columns defined.</p>;
+												}
+
+												return (
+													<div className="overflow-x-auto">
+														<table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+															<thead className="bg-muted/80">
+																<tr>
+																	{cols.map((col, idx) => (
+																		<th key={idx} className="px-2 py-2 text-left font-semibold text-neutralDark border-b border-border">
+																			{col}
+																		</th>
+																	))}
+																</tr>
+															</thead>
+															<tbody>
+																<tr className="bg-white/60">
+																	{cols.map((col, idx) => (
+																		<td key={idx} className="px-2 py-2 text-center text-muted-foreground border-b border-border">
+																			…
+																		</td>
+																	))}
+																</tr>
+															</tbody>
+														</table>
+													</div>
+												);
+											})()}
 										</div>
 									</div>
 									{assessment.gameLevel?.tableB && (
