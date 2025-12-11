@@ -40,6 +40,15 @@ function withColor(blocks) {
 	return blocks.map(b => ({ ...b, color: colorMap[b.type] || 'bg-neutral-200' }));
 }
 
+function shuffleBlocks(blocks) {
+	const arr = [...blocks];
+	for (let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[arr[i], arr[j]] = [arr[j], arr[i]];
+	}
+	return arr;
+}
+
 function makeBlock(block) {
 	return {
 		id: crypto.randomUUID ? crypto.randomUUID() : `b_${Date.now()}_${Math.random()}`,
@@ -205,7 +214,7 @@ export default function TakeAssessmentPage() {
 			if (assessmentData.type === 'gameLevel') {
 				setGameBlocks([]);
 				const seq = assessmentData.gameLevel?.blockSequence || [];
-				const palette = withColor(seq);
+				const palette = shuffleBlocks(withColor(seq));
 				setGamePalette(palette);
 			}
 		} catch (err) {
