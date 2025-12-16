@@ -1,9 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useMemo as useReactMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { db } from '@/firebase';
-import { doc, getDoc, onSnapshot, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { timeAgo, roleFlair } from '@/lib/utils';
 import { BadgeCheck, MessageSquare, ChevronDown, ChevronUp, ArrowBigUp, ArrowBigDown, Reply, ShieldCheck } from 'lucide-react';
+import { CodeBlockPlus } from '@/components/CodeBlockPlus';
 
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 const MOD_ROLES = ['admin', 'teacher', 'instructor'];
@@ -26,6 +27,16 @@ export default function TopicPage({ params }) {
   const [expanded, setExpanded] = useState({});
   const [text, setText] = useState('');
   const [sort, setSort] = useState('new');
+  const [notes, setNotes] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+
+  const markdownComponents = useReactMemo(
+    () => ({
+      code: (props) => <CodeBlockPlus {...props} />,
+    }),
+    []
+  );
 
   useEffect(() => {
     const ref = doc(db, 'post', id);
@@ -35,6 +46,22 @@ export default function TopicPage({ params }) {
     });
     return () => unsub();
   }, [id]);
+
+  useEffect(() => {
+    if (!isModerator || !id || notesLoaded) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/forum/notes?postId=${encodeURIComponent(id)}&userRole=${encodeURIComponent(userData?.role || '')}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setNotes(data.notes || '');
+      } catch {
+        // ignore
+      } finally {
+        setNotesLoaded(true);
+      }
+    })();
+  }, [id, isModerator, notesLoaded, userData?.role]);
 
   useEffect(() => {
     if (!post) return;
@@ -195,10 +222,11 @@ export default function TopicPage({ params }) {
 
   return (
     <div className="min-h-screen bg-slate-50/80 dark:bg-slate-900">
-      <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
-        <Link href="/forum" className="text-indigo-600 hover:underline text-sm">← Back to Forum</Link>
+      <div className="max-w-5xl mx-auto py-10 px-4 space-y-6 md:grid md:grid-cols-[minmax(0,1.2fr)_260px] md:gap-6">
+        <div className="space-y-6">
+          <Link href="/forum" className="text-indigo-600 hover:underline text-sm">← Back to Forum</Link>
 
-        <Card className="p-6 shadow-sm bg-white/80 dark:bg-slate-800/80">
+          <Card className="p-6 shadow-sm bg-white/80 dark:bg-slate-800/80">
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 justify-between">
               <div className="flex items-center gap-3">
@@ -214,12 +242,17 @@ export default function TopicPage({ params }) {
               <div className="flex flex-wrap gap-2">
                 {post.isPinned && <Badge variant="secondary" className="gap-1"><BadgeCheck className="w-3 h-3" /> Pinned</Badge>}
                 {post.isLocked && <Badge variant="warning">Locked</Badge>}
+                {post.isExamRelevant && <Badge variant="warning" className="gap-1">Exam relevant</Badge>}
+                {post.isInKnowledgeBase && <Badge variant="secondary" className="gap-1">In Knowledge Base</Badge>}
                 {instructorReplied && <Badge variant="success" className="gap-1"><ShieldCheck className="w-3 h-3" /> Instructor replied</Badge>}
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{post.title}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mr-2">{post.title}</h1>
+              <ResolutionChip resolutionStatus={post.resolutionStatus} />
+            </div>
             <div className="prose prose-slate dark:prose-invert max-w-none">
-              <ReactMarkdown>{post.content || ''}</ReactMarkdown>
+              <ReactMarkdown components={markdownComponents}>{post.content || ''}</ReactMarkdown>
             </div>
             {Array.isArray(post.images) && post.images.length > 0 && (
               <ImageGallery images={post.images} />
@@ -227,6 +260,47 @@ export default function TopicPage({ params }) {
             {Array.isArray(post.tags) && post.tags.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {post.tags.map((t, i) => (<Badge key={i} variant="outline">#{t}</Badge>))}
+              </div>
+            )}
+            {isModerator && (
+              <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                <Button
+                  size="sm"
+                  variant={post.isExamRelevant ? 'default' : 'outline'}
+                  onClick={async () => {
+                    await fetch('/api/forum/exam', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        postId: post.id,
+                        userId: user?.uid,
+                        userRole: userData?.role,
+                        isExamRelevant: !post.isExamRelevant,
+                      }),
+                    });
+                  }}
+                >
+                  {post.isExamRelevant ? 'Unset exam relevant' : 'Mark exam relevant'}
+                </Button>
+                {!post.isInKnowledgeBase && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await fetch('/api/forum/promote', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          postId: post.id,
+                          userId: user?.uid,
+                          userRole: userData?.role,
+                        }),
+                      });
+                    }}
+                  >
+                    Promote to Knowledge Base
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -239,7 +313,33 @@ export default function TopicPage({ params }) {
               <Badge variant="secondary" className="gap-1"><MessageSquare className="w-3 h-3" /> Markdown supported</Badge>
             </div>
             <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a thoughtful, code-friendly reply..." className="font-mono" rows={5} />
-            <div className="flex justify-end mt-3">
+            <div className="flex justify-between mt-3">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span>Resolution:</span>
+                <ResolutionChip resolutionStatus={post.resolutionStatus} />
+                {(isModerator || user?.uid === post.authorId) && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant={post.resolutionStatus === 'solved' ? 'default' : 'outline'}
+                      onClick={async () => {
+                        await fetch('/api/forum/status', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            postId: post.id,
+                            userId: user.uid,
+                            userRole: userData?.role,
+                            resolutionStatus: post.resolutionStatus === 'solved' ? 'in_progress' : 'solved',
+                          }),
+                        });
+                      }}
+                    >
+                      {post.resolutionStatus === 'solved' ? 'Mark in progress' : 'Mark solved'}
+                    </Button>
+                  </>
+                )}
+              </div>
               <Button onClick={sendReply}>Post comment</Button>
             </div>
           </Card>
@@ -254,6 +354,17 @@ export default function TopicPage({ params }) {
         </div>
 
         <div className="space-y-3">
+          {post.acceptedReplyId && (
+            <AcceptedAnswerBanner
+              post={post}
+              replies={replies}
+              onVote={vote}
+              onDelete={del}
+              onReply={replyTo}
+              expanded={expanded}
+              toggle={toggle}
+            />
+          )}
           {tree.map((r) => (
             <ReplyNode
               key={r.id}
@@ -265,6 +376,7 @@ export default function TopicPage({ params }) {
               onReply={replyTo}
               expanded={expanded}
               toggle={toggle}
+              acceptedReplyId={post.acceptedReplyId}
             />
           ))}
           {replies.length === 0 && (
@@ -277,11 +389,94 @@ export default function TopicPage({ params }) {
           )}
         </div>
       </div>
+
+      <aside className="mt-10 md:mt-0 space-y-4">
+        <TimelineRail post={post} replies={replies} />
+        {isModerator && (
+          <Card className="p-4 bg-slate-50/70 dark:bg-slate-800/80">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Instructor notes</p>
+            </div>
+            <Textarea
+              rows={6}
+              className="text-xs"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Private notes for instructors only. Summarize misconceptions, follow-ups, or exam hints."
+            />
+            <div className="flex justify-end mt-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (!user) return;
+                  setNotesSaving(true);
+                  try {
+                    await fetch('/api/forum/notes', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        postId: post.id,
+                        userId: user.uid,
+                        userRole: userData?.role,
+                        notes,
+                      }),
+                    });
+                  } finally {
+                    setNotesSaving(false);
+                  }
+                }}
+                disabled={notesSaving}
+              >
+                {notesSaving ? 'Saving…' : 'Save notes'}
+              </Button>
+            </div>
+          </Card>
+        )}
+      </aside>
     </div>
   );
 }
 
-function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, toggle }) {
+function ResolutionChip({ resolutionStatus }) {
+  const status = resolutionStatus || 'unanswered';
+  if (status === 'solved') {
+    return <Badge variant="success" className="text-xs">Solved</Badge>;
+  }
+  if (status === 'in_progress') {
+    return <Badge variant="secondary" className="text-xs">In progress</Badge>;
+  }
+  return <Badge variant="outline" className="text-xs">Unanswered</Badge>;
+}
+
+function AcceptedAnswerBanner({ post, replies, onVote, onDelete, onReply, expanded, toggle }) {
+  const accepted = Array.isArray(replies) ? replies.find((r) => r.id === post.acceptedReplyId) : null;
+  if (!accepted) return null;
+  return (
+    <Card className="border border-emerald-300 bg-emerald-50/70 dark:bg-emerald-900/20">
+      <div className="flex items-center justify-between mb-2 px-4 pt-3">
+        <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-200">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Accepted answer</span>
+        </div>
+      </div>
+      <div className="px-2 pb-3">
+        <ReplyNode
+          r={accepted}
+          depth={0}
+          postId={post.id}
+          onVote={onVote}
+          onDelete={onDelete}
+          onReply={onReply}
+          expanded={expanded}
+          toggle={toggle}
+          acceptedReplyId={post.acceptedReplyId}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, toggle, acceptedReplyId }) {
   const [subText, setSubText] = useState('');
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(r.content || '');
@@ -295,6 +490,8 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
 
   const canEdit = user && (user.uid === r.authorId || isModerator);
   const canDelete = user && (user.uid === r.authorId || isModerator);
+  const canAccept = user && (isModerator || user.uid === r.postAuthorId || user.uid === userData?.uid);
+  const isAccepted = acceptedReplyId === r.id;
 
   const saveEdit = async () => {
     if (!canEdit) return;
@@ -323,9 +520,10 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
   };
 
   const isInstructor = ['teacher', 'instructor', 'admin'].includes(r.role);
+  const markers = r.markers || {};
 
   return (
-    <Card className={`p-4 bg-white/80 dark:bg-slate-800/80 border-l-4 ${borderColor}`} style={{ marginLeft: depth * 16 }}>
+    <Card className={`p-4 bg-white/80 dark:bg-slate-800/80 border-l-4 ${borderColor} ${isAccepted ? 'ring-2 ring-emerald-400' : ''}`} style={{ marginLeft: depth * 16 }}>
       <div className="flex items-start gap-3">
         <div className="flex flex-col items-center gap-1">
           <IconButton icon={<ArrowBigUp className="w-4 h-4" />} label="Upvote" onClick={() => onVote(r.id, 'upvote')} />
@@ -337,6 +535,7 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
             <span className="font-medium text-slate-900 dark:text-white">{r.authorName || 'Anonymous'}</span>
             {(() => { const f = roleFlair(r.role); return (<Badge variant={f.variant}>{f.emoji} {f.label}</Badge>); })()}
             {isInstructor && <Badge variant="success" className="gap-1"><ShieldCheck className="w-3 h-3" /> Instructor</Badge>}
+            {isAccepted && <Badge variant="success" className="gap-1"><BadgeCheck className="w-3 h-3" /> Accepted</Badge>}
             <span className="text-xs text-slate-500">{timeAgo(r.createdAt)}</span>
             <button className="ml-auto text-xs text-slate-500 flex items-center gap-1" onClick={() => toggle(r.id)}>
               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} {isOpen ? 'Collapse' : 'Expand'}
@@ -353,7 +552,7 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
             </div>
           ) : (
             <div className="prose prose-slate dark:prose-invert max-w-none">
-              <ReactMarkdown>{r.content || ''}</ReactMarkdown>
+              <ReactMarkdown components={{ code: (props) => <CodeBlockPlus {...props} /> }}>{r.content || ''}</ReactMarkdown>
             </div>
           )}
 
@@ -365,6 +564,41 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
                 </button>
                 {canEdit && <button className="hover:text-indigo-600" onClick={() => setEditing((v) => !v)}>Edit</button>}
                 {canDelete && <button className="text-red-500 hover:text-red-600" onClick={() => onDelete(r.id)}>Delete</button>}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                <span className="uppercase tracking-wide text-[10px] text-slate-400">Quality markers:</span>
+                <MarkerChip
+                  label="Has code"
+                  active={!!markers.hasCode}
+                  onToggle={async (next) => {
+                    await updateMarkers(postId, r.id, user, userData, { hasCode: next });
+                  }}
+                  canToggle={!!user && (isModerator || user.uid === r.authorId)}
+                />
+                <MarkerChip
+                  label="Shows attempt"
+                  active={!!markers.showsAttempt}
+                  onToggle={async (next) => {
+                    await updateMarkers(postId, r.id, user, userData, { showsAttempt: next });
+                  }}
+                  canToggle={!!user && (isModerator || user.uid === r.authorId)}
+                />
+                <MarkerChip
+                  label="Explains why"
+                  active={!!markers.explainsWhy}
+                  onToggle={async (next) => {
+                    await updateMarkers(postId, r.id, user, userData, { explainsWhy: next });
+                  }}
+                  canToggle={!!user && (isModerator || user.uid === r.authorId)}
+                />
+                <MarkerChip
+                  label="Cites ref"
+                  active={!!markers.citesRef}
+                  onToggle={async (next) => {
+                    await updateMarkers(postId, r.id, user, userData, { citesRef: next });
+                  }}
+                  canToggle={!!user && (isModerator || user.uid === r.authorId)}
+                />
               </div>
               <div className="mt-2 flex gap-2">
                 <Textarea value={subText} onChange={(e) => setSubText(e.target.value)} placeholder="Reply with code or context..." rows={2} className="font-mono" />
@@ -395,6 +629,43 @@ function ReplyNode({ r, depth, postId, onVote, onDelete, onReply, expanded, togg
   );
 }
 
+async function updateMarkers(postId, replyId, user, userData, markers) {
+  if (!user) return;
+  try {
+    await fetch('/api/forum/markers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postId,
+        replyId,
+        userId: user.uid,
+        userRole: userData?.role,
+        markers,
+      }),
+    });
+  } catch {
+    // swallow; snapshot listener will eventually sync state if backend succeeds
+  }
+}
+
+function MarkerChip({ label, active, onToggle, canToggle }) {
+  const classes = active
+    ? 'px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200'
+    : 'px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 border border-slate-200';
+  if (!canToggle) {
+    return <span className={classes}>{label}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className={classes + ' hover:bg-emerald-50 hover:border-emerald-300 transition'}
+      onClick={() => onToggle(!active)}
+    >
+      {label}
+    </button>
+  );
+}
+
 function IconButton({ icon, label, onClick }) {
   return (
     <button
@@ -404,5 +675,77 @@ function IconButton({ icon, label, onClick }) {
     >
       {icon}
     </button>
+  );
+}
+
+function TimelineRail({ post, replies }) {
+  const all = Array.isArray(replies) ? replies : [];
+  if (!post) return null;
+  const items = [
+    {
+      id: post.id,
+      type: 'post',
+      label: 'Thread created',
+      createdAt: post.createdAt,
+    },
+    ...all.map((r) => ({
+      id: r.id,
+      type: 'reply',
+      label: r.authorName || 'Reply',
+      createdAt: r.createdAt,
+    })),
+  ].sort((a, b) => {
+    const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+    const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+    return ta - tb;
+  });
+
+  if (items.length <= 1) return null;
+
+  const first = items[0].createdAt;
+  const last = items[items.length - 1].createdAt;
+  const minTime = first?.toMillis ? first.toMillis() : new Date(first).getTime();
+  const maxTime = last?.toMillis ? last.toMillis() : new Date(last).getTime();
+  const span = Math.max(maxTime - minTime, 1);
+
+  return (
+    <Card className="p-4 bg-white/80 dark:bg-slate-800/80">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 mb-2">Timeline</p>
+      <div className="relative h-40">
+        <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+        {items.map((item) => {
+          const t = item.createdAt?.toMillis ? item.createdAt.toMillis() : new Date(item.createdAt).getTime();
+          const offset = ((t - minTime) / span) * 100;
+          const isPost = item.type === 'post';
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className="absolute left-0 flex items-center gap-2 text-left group"
+              style={{ top: `${offset}%`, transform: 'translateY(-50%)' }}
+              onClick={() => {
+                if (isPost) {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  return;
+                }
+                const el = document.getElementById(`reply-${item.id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            >
+              <span
+                className={`ml-1 h-2.5 w-2.5 rounded-full border ${
+                  isPost
+                    ? 'bg-indigo-500 border-indigo-600'
+                    : 'bg-slate-100 border-slate-400 group-hover:bg-emerald-400 group-hover:border-emerald-500'
+                }`}
+              />
+              <span className="text-[10px] text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-100 max-w-[160px] truncate">
+                {isPost ? 'Thread created' : item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
