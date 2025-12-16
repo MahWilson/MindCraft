@@ -1,6 +1,22 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import {
+  ArrowBigUp,
+  ArrowBigDown,
+  BadgeCheck,
+  Filter,
+  MessageSquare,
+  Pin,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  Unlock,
+  Lock,
+  Wand2,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { ImageGallery } from '@/components/ui/image-gallery';
@@ -15,16 +31,29 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 
+const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
+
+const TAG_OPTIONS = ['JavaScript', 'Bug', 'Exam', 'Help', 'React', 'Project', 'Idea', 'UI'];
+const SORT_OPTIONS = [
+  { value: 'new', label: 'Newest' },
+  { value: 'active', label: 'Most Active' },
+  { value: 'unanswered', label: 'Unanswered' },
+];
+const MOD_ROLES = ['admin', 'teacher', 'instructor'];
+
 export default function ForumPage() {
   const { user, userData } = useAuth();
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState({ title: '', content: '' });
   const [loading, setLoading] = useState(false);
-  const [sortBy, setSortBy] = useState('new'); // 'new' | 'top'
-  const [timeRange, setTimeRange] = useState('all'); // 'all' | 'week' | 'month'
+  const [isFetching, setIsFetching] = useState(true);
+  const [sortBy, setSortBy] = useState('new');
   const [files, setFiles] = useState([]);
   const [tags, setTags] = useState([]);
   const [filterTags, setFilterTags] = useState([]);
+  const [isComposerOpen, setComposerOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const isModerator = MOD_ROLES.includes(userData?.role);
 
   useEffect(() => {
     const q = query(collection(db, 'post'), orderBy('createdAt', 'desc'));
@@ -33,46 +62,46 @@ export default function ForumPage() {
       const pinned = rows.filter((p) => !!p.isPinned);
       const others = rows.filter((p) => !p.isPinned);
       setPosts([...pinned, ...others]);
+      setIsFetching(false);
     });
     return () => unsub();
   }, []);
 
   const sortedPosts = useMemo(() => {
-    const pinned = posts.filter((p) => !!p.isPinned);
-    let others = posts.filter((p) => !p.isPinned);
-    // time range filter
-    const now = Date.now();
-    const cutoff = timeRange === 'week' ? now - 7 * 24 * 3600 * 1000 : timeRange === 'month' ? now - 30 * 24 * 3600 * 1000 : 0;
-    const inRange = (x) => {
-      if (!cutoff) return true;
-      const t = x.createdAt?.toMillis ? x.createdAt.toMillis() : new Date(x.createdAt).getTime();
-      return t >= cutoff;
-    };
-    others = others.filter(inRange);
-    const pinnedFiltered = pinned.filter(inRange);
-    // tag filter
     const byTag = (x) => {
       if (!filterTags.length) return true;
       const ts = Array.isArray(x.tags) ? x.tags : [];
       return filterTags.some((ft) => ts.includes(ft));
     };
-    others = others.filter(byTag);
-    const pinnedFinal = pinnedFiltered.filter(byTag);
-    const sorter = (a, b) => {
-      if (sortBy === 'top') return (b.score || 0) - (a.score || 0);
+    const answered = (p) => Array.isArray(p.replies) && p.replies.some((r) => MOD_ROLES.includes(r.role));
+    const pinned = posts.filter((p) => p.isPinned && byTag(p));
+    let list = posts.filter((p) => !p.isPinned && byTag(p));
+    if (sortBy === 'unanswered') {
+      list = list.filter((p) => !(Array.isArray(p.replies) && p.replies.length > 0));
+    }
+    list.sort((a, b) => {
+      if (sortBy === 'active') {
+        const ra = Array.isArray(a.replies) ? a.replies.length : 0;
+        const rb = Array.isArray(b.replies) ? b.replies.length : 0;
+        if (rb !== ra) return rb - ra;
+      }
       const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
       const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
       return tb - ta;
-    };
-    return [...pinnedFinal.sort(sorter), ...others.sort(sorter)];
-  }, [posts, sortBy]);
+    });
+    pinned.sort((a, b) => {
+      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+      return tb - ta;
+    });
+    return [...pinned, ...list].map((p) => ({ ...p, isAnswered: answered(p) }));
+  }, [posts, sortBy, filterTags]);
 
   const handleCreate = async () => {
-    if (!newPost.title || !newPost.content) return alert('Please provide a title and content');
+    if (!newPost.title.trim() || !newPost.content.trim()) return alert('Please provide a title and content');
     if (!user) return alert('Please sign in');
     setLoading(true);
     try {
-      // Upload images if any
       const imageUrls = [];
       for (const file of files) {
         const key = `posts/${user.uid}/${Date.now()}_${file.name}`;
@@ -94,10 +123,7 @@ export default function ForumPage() {
           tags,
         }),
       });
-      if (res.ok) {
-        setNewPost({ title: '', content: '' }); setFiles([]); setTags([]);
-      } else {
-        // Fallback to client-side write
+      if (!res.ok) {
         await addDoc(collection(db, 'post'), {
           title: newPost.title,
           content: newPost.content,
@@ -114,10 +140,13 @@ export default function ForumPage() {
           images: imageUrls,
           tags,
         });
-        setNewPost({ title: '', content: '' }); setFiles([]); setTags([]);
       }
+      setNewPost({ title: '', content: '' });
+      setFiles([]);
+      setTags([]);
+      setComposerOpen(false);
+      setShowPreview(false);
     } catch (err) {
-      // Fallback client-side
       await addDoc(collection(db, 'post'), {
         title: newPost.title,
         content: newPost.content,
@@ -134,7 +163,11 @@ export default function ForumPage() {
         images: [],
         tags,
       });
-      setNewPost({ title: '', content: '' }); setFiles([]); setTags([]);
+      setNewPost({ title: '', content: '' });
+      setFiles([]);
+      setTags([]);
+      setComposerOpen(false);
+      setShowPreview(false);
     } finally {
       setLoading(false);
     }
@@ -142,7 +175,7 @@ export default function ForumPage() {
 
   const handlePin = async (post) => {
     if (!user) return alert('Please sign in');
-    if (userData?.role !== 'teacher' && userData?.role !== 'admin') return alert('Only teachers/admins can pin');
+    if (!isModerator) return alert('Only teachers/admins can pin');
     try {
       const res = await fetch('/api/forum/pin', {
         method: 'PATCH',
@@ -150,7 +183,6 @@ export default function ForumPage() {
         body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role }),
       });
       if (!res.ok) {
-        // Fallback client-side
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
         if (!snap.exists()) return;
@@ -158,7 +190,6 @@ export default function ForumPage() {
         await updateDoc(pRef, { isPinned: !current });
       }
     } catch (err) {
-      // Fallback client-side
       const pRef = doc(db, 'post', post.id);
       const snap = await getDoc(pRef);
       if (!snap.exists()) return;
@@ -167,11 +198,36 @@ export default function ForumPage() {
     }
   };
 
+  const handleLock = async (post) => {
+    if (!user) return alert('Please sign in');
+    if (!isModerator) return alert('Only teachers/admins can lock');
+    try {
+      const res = await fetch('/api/forum/lock', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role }),
+      });
+      if (!res.ok) {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) return;
+        const current = !!snap.data().isLocked;
+        await updateDoc(pRef, { isLocked: !current });
+      }
+    } catch {
+      const pRef = doc(db, 'post', post.id);
+      const snap = await getDoc(pRef);
+      if (!snap.exists()) return;
+      const current = !!snap.data().isLocked;
+      await updateDoc(pRef, { isLocked: !current });
+    }
+  };
+
   const handleDelete = async (post) => {
     if (!user) return alert('Please sign in');
     if (!confirm('Delete this post?')) return;
-    const isOwner = post.authorId === user.uid
-    if (userData?.role !== 'teacher' && userData?.role !== 'admin' && !isOwner) return alert('Only teachers/admins or the post author can delete');
+    const isOwner = post.authorId === user.uid;
+    if (!isModerator && !isOwner) return alert('Only teachers/admins or the post author can delete');
     try {
       const res = await fetch('/api/forum/delete', {
         method: 'POST',
@@ -179,7 +235,6 @@ export default function ForumPage() {
         body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role, reason: '' }),
       });
       if (!res.ok) {
-        // Fallback client-side
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
         if (!snap.exists()) return;
@@ -195,7 +250,6 @@ export default function ForumPage() {
         await deleteDoc(pRef);
       }
     } catch (err) {
-      // Fallback client-side
       const pRef = doc(db, 'post', post.id);
       const snap = await getDoc(pRef);
       if (!snap.exists()) return;
@@ -274,148 +328,290 @@ export default function ForumPage() {
     }
   };
 
+  const emptyState = !isFetching && sortedPosts.length === 0;
+
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Forum</h1>
-        <div className="flex gap-2">
-          <Button variant={sortBy === 'new' ? 'default' : 'outline'} onClick={() => setSortBy('new')}>New</Button>
-          <Button variant={sortBy === 'top' ? 'default' : 'outline'} onClick={() => setSortBy('top')}>Top</Button>
-          <Button variant={timeRange === 'all' ? 'default' : 'outline'} onClick={() => setTimeRange('all')}>All</Button>
-          <Button variant={timeRange === 'week' ? 'default' : 'outline'} onClick={() => setTimeRange('week')}>This Week</Button>
-          <Button variant={timeRange === 'month' ? 'default' : 'outline'} onClick={() => setTimeRange('month')}>This Month</Button>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-gray-500">Filter by tag:</span>
-        {['Help','Project','Idea'].map((t) => (
-          <Button key={t} variant={filterTags.includes(t) ? 'default' : 'outline'} onClick={() => setFilterTags((ft) => ft.includes(t) ? ft.filter(x => x !== t) : [...ft, t])}>#{t}</Button>
-        ))}
-        {filterTags.length > 0 && (
-          <Button variant="outline" onClick={() => setFilterTags([])}>Clear</Button>
-        )}
-      </div>
-      <Card className="p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Start a New Discussion</h2>
-        <Input
-          placeholder="Title"
-          value={newPost.title}
-          onChange={(e) => setNewPost((p) => ({ ...p, title: e.target.value }))}
-          className="mb-3"
-        />
-        <Textarea
-          placeholder="Write your discussion..."
-          value={newPost.content}
-          onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
-          className="mb-4"
-        />
-        <div className="flex items-center gap-2 mb-3">
-          <input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-        </div>
-        {files.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {files.map((f, i) => (
-              <div key={i} className="border rounded p-1 text-xs truncate">{f.name}</div>
+    <div className="min-h-screen bg-slate-50/80 dark:bg-slate-900">
+      <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.12em] text-slate-500 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-500" /> Course Forum
+            </p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Threaded discussions</h1>
+            <p className="text-slate-600 dark:text-slate-300">Ask questions, share fixes, and learn from instructors.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setFilterTags([])}>
+              <Filter className="w-4 h-4" /> Clear filters
+            </Button>
+            <Button className="gap-2" onClick={() => setComposerOpen(true)}>
+              <Plus className="w-4 h-4" /> New post
+            </Button>
+          </div>
+        </header>
+
+        <Card className="p-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-white/70 dark:bg-slate-800/80">
+          <div className="flex gap-2">
+            {SORT_OPTIONS.map((s) => (
+              <Button
+                key={s.value}
+                size="sm"
+                variant={sortBy === s.value ? 'default' : 'outline'}
+                onClick={() => setSortBy(s.value)}
+                className="rounded-full"
+              >
+                {s.label}
+              </Button>
             ))}
           </div>
-        )}
-        <div className="flex items-center gap-2 mb-4">
-          <Button variant={tags.includes('Help') ? 'default' : 'outline'} onClick={() => setTags((t) => t.includes('Help') ? t.filter(x => x !== 'Help') : [...t, 'Help'])}>Help</Button>
-          <Button variant={tags.includes('Project') ? 'default' : 'outline'} onClick={() => setTags((t) => t.includes('Project') ? t.filter(x => x !== 'Project') : [...t, 'Project'])}>Project</Button>
-          <Button variant={tags.includes('Idea') ? 'default' : 'outline'} onClick={() => setTags((t) => t.includes('Idea') ? t.filter(x => x !== 'Idea') : [...t, 'Idea'])}>Idea</Button>
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={handleCreate} disabled={loading}>Post Discussion</Button>
-        </div>
-      </Card>
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
+            <Tag className="w-4 h-4 text-slate-500" />
+            {TAG_OPTIONS.map((t) => {
+              const active = filterTags.includes(t);
+              return (
+                <Button
+                  key={t}
+                  size="sm"
+                  variant={active ? 'default' : 'outline'}
+                  className="rounded-full text-xs"
+                  onClick={() => setFilterTags((ft) => (ft.includes(t) ? ft.filter((x) => x !== t) : [...ft, t]))}
+                >
+                  #{t}
+                </Button>
+              );
+            })}
+          </div>
+        </Card>
 
-      <div className="space-y-3">
-        {sortedPosts.map((post) => (
-          <Card key={post.id} className="p-0">
-            <div className="grid grid-cols-[56px_1fr] gap-0">
-              <div className="flex flex-col items-center justify-start border-r p-2">
-                <Button variant="ghost" onClick={() => handleVote(post, 'upvote')} className="px-2">▲</Button>
-                <div className="text-lg font-semibold">{post.score || 0}</div>
-                <Button variant="ghost" onClick={() => handleVote(post, 'downvote')} className="px-2">▼</Button>
+        <section className="space-y-3">
+          {isFetching && (
+            <>
+              <SkeletonPostCard />
+              <SkeletonPostCard />
+            </>
+          )}
+          {sortedPosts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              user={user}
+              isModerator={isModerator}
+              onVote={handleVote}
+              onReact={handleReact}
+              onPin={handlePin}
+              onLock={handleLock}
+              onDelete={handleDelete}
+            />
+          ))}
+          {emptyState && <EmptyState />}
+        </section>
+      </div>
+
+      {isComposerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur">
+          <div className="w-full max-w-3xl">
+            <Card className="p-6 shadow-2xl bg-white dark:bg-slate-900">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs uppercase text-slate-500 tracking-[0.12em]">Create post</p>
+                  <h3 className="text-xl font-semibold">Share your question or insight</h3>
+                </div>
+                <Button variant="ghost" onClick={() => setComposerOpen(false)}>Close</Button>
               </div>
-              <div className="p-4 space-y-3">
+              <div className="space-y-3">
+                <Input
+                  placeholder="Clear, concise title (e.g., 'Fixing debounce in React custom hook')"
+                  value={newPost.title}
+                  onChange={(e) => setNewPost((p) => ({ ...p, title: e.target.value }))}
+                />
+                <div className="flex gap-2">
+                  {TAG_OPTIONS.map((t) => {
+                    const active = tags.includes(t);
+                    return (
+                      <Button
+                        key={t}
+                        size="sm"
+                        variant={active ? 'default' : 'outline'}
+                        className="rounded-full text-xs"
+                        onClick={() => setTags((ft) => (ft.includes(t) ? ft.filter((x) => x !== t) : [...ft, t]))}
+                      >
+                        #{t}
+                      </Button>
+                    );
+                  })}
+                </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={post.authorName} className="w-7 h-7" />
-                    <Link href={`/forum/${post.id}`} className="text-lg font-semibold hover:underline">
-                      {post.title}
-                    </Link>
-                    {post.isPinned && (<Badge variant="secondary">Pinned</Badge>)}
-                    {post.isLocked && (<Badge variant="warning">Closed</Badge>)}
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <BadgeCheck className="w-4 h-4 text-indigo-500" />
+                    Markdown supported — use ``` for code
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>u/{post.authorName || 'anonymous'}</span>
+                  <Button variant="ghost" size="sm" className="gap-2" onClick={() => setShowPreview((p) => !p)}>
+                    <Wand2 className="w-4 h-4" />
+                    {showPreview ? 'Edit' : 'Preview'}
+                  </Button>
+                </div>
+                {!showPreview ? (
+                  <Textarea
+                    rows={8}
+                    placeholder="Describe the problem, share code blocks, and what you tried..."
+                    value={newPost.content}
+                    onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
+                    className="font-mono"
+                  />
+                ) : (
+                  <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 prose prose-slate max-w-none">
+                    <ReactMarkdown>{newPost.content || '_Nothing to preview yet_'}</ReactMarkdown>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+                  {files.length > 0 && (
+                    <div className="text-xs text-slate-500">{files.length} attachment{files.length > 1 ? 's' : ''}</div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setComposerOpen(false); setShowPreview(false); }}>Cancel</Button>
+                  <Button onClick={handleCreate} disabled={loading}>
+                    {loading ? 'Posting...' : 'Post discussion'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostCard({ post, user, isModerator, onVote, onReact, onPin, onLock, onDelete }) {
+  const replyCount = Array.isArray(post.replies) ? post.replies.length : 0;
+  const tags = Array.isArray(post.tags) ? post.tags : [];
+  const reactions = post.reactions || {};
+  const reactionCount = (emoji) => Object.values(reactions).filter((e) => e === emoji).length;
+  const instructorReplied = post.isAnswered;
+  return (
+    <Card className="p-0 overflow-hidden border border-slate-200 bg-white/80 dark:bg-slate-800/80">
+      <div className="grid grid-cols-[64px_1fr]">
+        <div className="flex flex-col items-center gap-2 border-r border-slate-100 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 py-4">
+          <IconPill icon={<ArrowBigUp className="w-5 h-5" />} label="Upvote" onClick={() => onVote(post, 'upvote')} />
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">Vote</div>
+          <IconPill icon={<ArrowBigDown className="w-5 h-5" />} label="Downvote" onClick={() => onVote(post, 'downvote')} />
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {post.isPinned && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Pin className="w-3 h-3" /> Pinned
+                  </Badge>
+                )}
+                {post.isLocked && (
+                  <Badge variant="warning" className="gap-1">
+                    <Lock className="w-3 h-3" /> Locked
+                  </Badge>
+                )}
+                {instructorReplied && (
+                  <Badge variant="success" className="gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Instructor replied
+                  </Badge>
+                )}
+              </div>
+              <Link href={`/forum/${post.id}`} className="text-xl font-semibold text-slate-900 dark:text-white hover:text-indigo-600">
+                {post.title}
+              </Link>
+              <p className="text-slate-700 dark:text-slate-200 line-clamp-3">{post.content}</p>
+              {Array.isArray(post.images) && post.images.length > 0 && (
+                <ImageGallery images={post.images} />
+              )}
+              {tags.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {tags.map((t) => (
+                    <Badge key={t} variant="outline" className="rounded-full">#{t}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col items-end text-sm text-slate-500">
+              <span className="flex items-center gap-2">
+                <Avatar name={post.authorName} className="w-8 h-8" />
+                <div className="text-right">
+                  <div className="text-slate-900 dark:text-white font-medium">{post.authorName || 'Anonymous'}</div>
+                  <div className="flex items-center gap-2 text-xs">
                     {(() => { const f = roleFlair(post.role); return (<Badge variant={f.variant}>{f.emoji} {f.label}</Badge>); })()}
                     <span>{timeAgo(post.createdAt)}</span>
                   </div>
                 </div>
-                <p className="text-gray-700">{post.content}</p>
-                {Array.isArray(post.images) && post.images.length > 0 && (
-                  <ImageGallery images={post.images} />
-                )}
-                {Array.isArray(post.tags) && post.tags.length > 0 && (
-                  <div className="flex gap-2 flex-wrap">
-                    {post.tags.map((t, i) => (<Badge key={i} variant="outline">#{t}</Badge>))}
-                  </div>
-                )}
-                <div className="flex items-center gap-4 border-t pt-2 mt-1 text-sm">
-                  <Link href={`/forum/${post.id}`} className="text-gray-600 hover:text-gray-900">💬 {Array.isArray(post.replies) ? post.replies.length : 0} Comments</Link>
-                  <button className="text-gray-600 hover:text-gray-900" onClick={() => { const url = `${location.origin}/forum/${post.id}`; if (navigator.share) navigator.share({ title: post.title, url }); else navigator.clipboard.writeText(url); }}>🔗 Share</button>
-                  <div className="flex items-center gap-2">
-                    <button className="text-gray-600 hover:text-gray-900" onClick={() => handleReact(post, '👍')}>👍 {(Object.values(post.reactions || {}).filter(e => e === '👍').length)}</button>
-                    <button className="text-gray-600 hover:text-gray-900" onClick={() => handleReact(post, '❤️')}>❤️ {(Object.values(post.reactions || {}).filter(e => e === '❤️').length)}</button>
-                    <button className="text-gray-600 hover:text-gray-900" onClick={() => handleReact(post, '🎉')}>🎉 {(Object.values(post.reactions || {}).filter(e => e === '🎉').length)}</button>
-                    <button className="text-gray-600 hover:text-gray-900" onClick={() => handleReact(post, '🤔')}>🤔 {(Object.values(post.reactions || {}).filter(e => e === '🤔').length)}</button>
-                    <button className="text-gray-600 hover:text-gray-900" onClick={() => handleReact(post, '👀')}>👀 {(Object.values(post.reactions || {}).filter(e => e === '👀').length)}</button>
-                  </div>
-                  <div className="ml-auto flex gap-2">
-                    {(userData?.role === 'teacher' || userData?.role === 'admin') && (
-                      <>
-                        <Button variant="outline" onClick={() => handlePin(post)}>{post.isPinned ? 'Unpin' : 'Pin'}</Button>
-                        <Button variant="outline" onClick={() => handleLock(post)}>{post.isLocked ? 'Unlock' : 'Lock'}</Button>
-                      </>
-                    )}
-                    {(userData?.role === 'teacher' || userData?.role === 'admin' || post.authorId === user?.uid) && (
-                      <Button variant="destructive" onClick={() => handleDelete(post)}>Delete</Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              </span>
             </div>
-          </Card>
-        ))}
-        {posts.length === 0 && (
-          <div className="text-center text-gray-500 py-8">No discussions yet</div>
-        )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-700 text-sm">
+            <Link href={`/forum/${post.id}`} className="flex items-center gap-1 text-slate-600 hover:text-indigo-600">
+              <MessageSquare className="w-4 h-4" /> {replyCount} comment{replyCount !== 1 ? 's' : ''}
+            </Link>
+            <div className="flex items-center gap-1 text-slate-600">
+              {['👍', '❤️', '🎉', '🤔', '👀'].map((emoji) => (
+                <button key={emoji} onClick={() => onReact(post, emoji)} className="px-2 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
+                  {emoji} {reactionCount(emoji)}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {isModerator && (
+                <>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => onPin(post)}>
+                    <Pin className="w-4 h-4" /> {post.isPinned ? 'Unpin' : 'Pin'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => onLock(post)}>
+                    {post.isLocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />} {post.isLocked ? 'Unlock' : 'Lock'}
+                  </Button>
+                </>
+              )}
+              {(isModerator || post.authorId === user?.uid) && (
+                <Button size="sm" variant="destructive" onClick={() => onDelete(post)}>Delete</Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
-  const handleLock = async (post) => {
-    if (!user) return alert('Please sign in');
-    if (userData?.role !== 'teacher' && userData?.role !== 'admin') return alert('Only teachers/admins can lock');
-    try {
-      const res = await fetch('/api/forum/lock', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role })
-      });
-      if (!res.ok) {
-        const pRef = doc(db, 'post', post.id);
-        const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
-        const current = !!snap.data().isLocked;
-        await updateDoc(pRef, { isLocked: !current });
-      }
-    } catch {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      const current = !!snap.data().isLocked;
-      await updateDoc(pRef, { isLocked: !current });
-    }
-  };
+
+function IconPill({ icon, onClick, label }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:border-indigo-200 transition bg-white dark:bg-slate-800"
+    >
+      {icon}
+    </button>
+  );
+}
+
+function SkeletonPostCard() {
+  return (
+    <Card className="p-5 border border-slate-200 bg-white/60 animate-pulse">
+      <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
+      <div className="h-5 w-3/4 bg-slate-200 rounded mb-3" />
+      <div className="h-3 w-full bg-slate-200 rounded mb-1" />
+      <div className="h-3 w-5/6 bg-slate-200 rounded" />
+    </Card>
+  );
+}
+
+function EmptyState() {
+  return (
+    <Card className="p-10 text-center border-dashed border-2 border-slate-200 bg-white/60">
+      <div className="mx-auto w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 mb-3">
+        <MessageSquare className="w-6 h-6" />
+      </div>
+      <h3 className="text-lg font-semibold text-slate-900">No posts yet</h3>
+      <p className="text-slate-600">Be the first to ask a question or share a solution.</p>
+    </Card>
+  );
+}
