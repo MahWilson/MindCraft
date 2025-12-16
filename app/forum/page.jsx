@@ -41,6 +41,12 @@ const SORT_OPTIONS = [
 ];
 const MOD_ROLES = ['admin', 'teacher', 'instructor'];
 
+const STATUS_LABELS = {
+  unanswered: 'Unanswered',
+  in_progress: 'In progress',
+  solved: 'Solved',
+};
+
 export default function ForumPage() {
   const { user, userData } = useAuth();
   const [posts, setPosts] = useState([]);
@@ -53,6 +59,8 @@ export default function ForumPage() {
   const [filterTags, setFilterTags] = useState([]);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [similarResults, setSimilarResults] = useState([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
   const isModerator = MOD_ROLES.includes(userData?.role);
 
   useEffect(() => {
@@ -66,6 +74,36 @@ export default function ForumPage() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const q = newPost.title?.trim();
+    if (!q || q.length < 3) {
+      setSimilarResults([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      try {
+        setSimilarLoading(true);
+        const res = await fetch('/api/forum/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, limit: 8 }),
+        });
+        if (!res.ok) throw new Error('analyze failed');
+        const data = await res.json();
+        if (!cancelled) setSimilarResults(data.results || []);
+      } catch {
+        if (!cancelled) setSimilarResults([]);
+      } finally {
+        if (!cancelled) setSimilarLoading(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [newPost.title]);
 
   const sortedPosts = useMemo(() => {
     const byTag = (x) => {
@@ -94,7 +132,11 @@ export default function ForumPage() {
       const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
       return tb - ta;
     });
-    return [...pinned, ...list].map((p) => ({ ...p, isAnswered: answered(p) }));
+    return [...pinned, ...list].map((p) => ({
+      ...p,
+      isAnswered: answered(p),
+      resolutionStatus: p.resolutionStatus || (answered(p) ? 'in_progress' : 'unanswered'),
+    }));
   }, [posts, sortBy, filterTags]);
 
   const handleCreate = async () => {
@@ -410,7 +452,7 @@ export default function ForumPage() {
 
       {isComposerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur">
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-4xl">
             <Card className="p-6 shadow-2xl bg-white dark:bg-slate-900">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -419,62 +461,104 @@ export default function ForumPage() {
                 </div>
                 <Button variant="ghost" onClick={() => setComposerOpen(false)}>Close</Button>
               </div>
-              <div className="space-y-3">
-                <Input
-                  placeholder="Clear, concise title (e.g., 'Fixing debounce in React custom hook')"
-                  value={newPost.title}
-                  onChange={(e) => setNewPost((p) => ({ ...p, title: e.target.value }))}
-                />
-                <div className="flex gap-2">
-                  {TAG_OPTIONS.map((t) => {
-                    const active = tags.includes(t);
-                    return (
-                      <Button
-                        key={t}
-                        size="sm"
-                        variant={active ? 'default' : 'outline'}
-                        className="rounded-full text-xs"
-                        onClick={() => setTags((ft) => (ft.includes(t) ? ft.filter((x) => x !== t) : [...ft, t]))}
-                      >
-                        #{t}
-                      </Button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <BadgeCheck className="w-4 h-4 text-indigo-500" />
-                    Markdown supported — use ``` for code
-                  </div>
-                  <Button variant="ghost" size="sm" className="gap-2" onClick={() => setShowPreview((p) => !p)}>
-                    <Wand2 className="w-4 h-4" />
-                    {showPreview ? 'Edit' : 'Preview'}
-                  </Button>
-                </div>
-                {!showPreview ? (
-                  <Textarea
-                    rows={8}
-                    placeholder="Describe the problem, share code blocks, and what you tried..."
-                    value={newPost.content}
-                    onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
-                    className="font-mono"
+              <div className="grid gap-4 md:grid-cols-[2fr_1.2fr]">
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Clear, concise title (e.g., 'Fixing debounce in React custom hook')"
+                    value={newPost.title}
+                    onChange={(e) => setNewPost((p) => ({ ...p, title: e.target.value }))}
                   />
-                ) : (
-                  <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 prose prose-slate max-w-none">
-                    <ReactMarkdown>{newPost.content || '_Nothing to preview yet_'}</ReactMarkdown>
+                  <div className="flex gap-2 flex-wrap">
+                    {TAG_OPTIONS.map((t) => {
+                      const active = tags.includes(t);
+                      return (
+                        <Button
+                          key={t}
+                          size="sm"
+                          variant={active ? 'default' : 'outline'}
+                          className="rounded-full text-xs"
+                          onClick={() => setTags((ft) => (ft.includes(t) ? ft.filter((x) => x !== t) : [...ft, t]))}
+                        >
+                          #{t}
+                        </Button>
+                      );
+                    })}
                   </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-                  {files.length > 0 && (
-                    <div className="text-xs text-slate-500">{files.length} attachment{files.length > 1 ? 's' : ''}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <BadgeCheck className="w-4 h-4 text-indigo-500" />
+                      Markdown supported — use ``` for code
+                    </div>
+                    <Button variant="ghost" size="sm" className="gap-2" onClick={() => setShowPreview((p) => !p)}>
+                      <Wand2 className="w-4 h-4" />
+                      {showPreview ? 'Edit' : 'Preview'}
+                    </Button>
+                  </div>
+                  {!showPreview ? (
+                    <Textarea
+                      rows={8}
+                      placeholder="Describe the problem, share code blocks, and what you tried..."
+                      value={newPost.content}
+                      onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
+                      className="font-mono"
+                    />
+                  ) : (
+                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 prose prose-slate max-w-none">
+                      <ReactMarkdown>{newPost.content || '_Nothing to preview yet_'}</ReactMarkdown>
+                    </div>
                   )}
+                  <div className="flex items-center gap-3">
+                    <input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+                    {files.length > 0 && (
+                      <div className="text-xs text-slate-500">{files.length} attachment{files.length > 1 ? 's' : ''}</div>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => { setComposerOpen(false); setShowPreview(false); }}>Cancel</Button>
+                    <Button onClick={handleCreate} disabled={loading}>
+                      {loading ? 'Posting...' : 'Post discussion'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setComposerOpen(false); setShowPreview(false); }}>Cancel</Button>
-                  <Button onClick={handleCreate} disabled={loading}>
-                    {loading ? 'Posting...' : 'Post discussion'}
-                  </Button>
+                <div className="border-l border-slate-200 dark:border-slate-800 pl-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Similar questions</p>
+                    {similarLoading && <span className="text-[10px] text-slate-500">Searching…</span>}
+                  </div>
+                  {(!similarResults || similarResults.length === 0) && !similarLoading && (
+                    <p className="text-xs text-slate-500">Start typing a clear title to see existing related threads.</p>
+                  )}
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {similarResults.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="w-full text-left rounded-md border border-slate-200 dark:border-slate-700 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                        onClick={() => window.open(`/forum/${item.id}`, '_blank')}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-medium text-slate-700 dark:text-slate-200 line-clamp-1">
+                            {item.title}
+                          </span>
+                          <ResolutionBadgeSmall status={item.resolutionStatus} />
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-2">{item.snippet}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Array.isArray(item.tags) &&
+                            item.tags.map((t) => (
+                              <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                #{t}
+                              </span>
+                            ))}
+                          {item.hasInstructorReply && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3" /> Instructor replied
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </Card>
@@ -513,6 +597,7 @@ function PostCard({ post, user, isModerator, onVote, onReact, onPin, onLock, onD
                     <Lock className="w-3 h-3" /> Locked
                   </Badge>
                 )}
+                <ResolutionBadgeSmall status={post.resolutionStatus} />
                 {instructorReplied && (
                   <Badge variant="success" className="gap-1">
                     <ShieldCheck className="w-3 h-3" /> Instructor replied
@@ -591,6 +676,18 @@ function IconPill({ icon, onClick, label }) {
       {icon}
     </button>
   );
+}
+
+function ResolutionBadgeSmall({ status }) {
+  const s = status || 'unanswered';
+  const label = STATUS_LABELS[s] || 'Unanswered';
+  if (s === 'solved') {
+    return <Badge variant="success" className="gap-1 text-[10px] px-2 py-0.5">Solved</Badge>;
+  }
+  if (s === 'in_progress') {
+    return <Badge variant="secondary" className="gap-1 text-[10px] px-2 py-0.5">In progress</Badge>;
+  }
+  return <Badge variant="outline" className="gap-1 text-[10px] px-2 py-0.5">Unanswered</Badge>;
 }
 
 function SkeletonPostCard() {
