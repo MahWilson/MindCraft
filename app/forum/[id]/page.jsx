@@ -585,8 +585,25 @@ export default function TopicPage({ params }) {
                 </div>
               )}
 
+        {(() => {
+          const fromVideos = Array.isArray(post.videos) ? post.videos : [];
+          const fromImages = Array.isArray(post.images) ? post.images : [];
+          const all = [...fromVideos, ...fromImages].filter((x) => typeof x === 'string' && x.trim());
+          const videos = all.filter((url) => /\.(mp4|webm|ogg)(\?|#|$)/i.test(String(url || '')));
+          if (videos.length === 0) return null;
+          return (
+            <div className="mt-3 space-y-2">
+              {videos.slice(0, 1).map((src) => (
+                <div key={src} className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-black">
+                  <video src={src} controls className="w-full max-h-[520px] object-contain" />
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {Array.isArray(post.images) && post.images.length > 0 && (
-            <ImageGallery images={post.images} />
+            <ImageGallery images={post.images.filter((url) => typeof url === 'string' && !/\.(mp4|webm|ogg)(\?|#|$)/i.test(String(url || '')))} />
               )}
               {Array.isArray(post.tags) && post.tags.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
