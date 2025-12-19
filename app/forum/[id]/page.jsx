@@ -95,7 +95,7 @@ function AcademicSection({ type, children }) {
 export default function TopicPage({ params }) {
   const { id } = params;
   const { user, userData } = useAuth();
-  const isModerator = MOD_ROLES.includes(userData?.role);
+  const isModerator = MOD_ROLES.includes(String(userData?.role || '').toLowerCase());
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [replies, setReplies] = useState([]);
@@ -1066,7 +1066,7 @@ function ReplyNode({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(r.content || "");
   const { user, userData } = useAuth();
-  const isModerator = MOD_ROLES.includes(userData?.role);
+  const isModerator = MOD_ROLES.includes(String(userData?.role || '').toLowerCase());
   const [resolvedName, setResolvedName] = useState("");
   const [resolvedAvatar, setResolvedAvatar] = useState("");
   useEffect(() => {

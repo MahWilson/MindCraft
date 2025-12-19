@@ -136,7 +136,7 @@ export default function ForumPage() {
     const parts = t.split(pattern);
     return parts.map((p, i) => pattern.test(p) ? <span key={i} className="bg-yellow-100 text-slate-900 px-[2px] rounded">{p}</span> : p);
   }, []);
-  const isModerator = MOD_ROLES.includes(userData?.role);
+  const isModerator = MOD_ROLES.includes(String(userData?.role || '').toLowerCase());
   const [nameMap, setNameMap] = useState({});
 
   // Lock body scroll when composer is open
