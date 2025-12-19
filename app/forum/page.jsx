@@ -15,14 +15,6 @@ import {
   Tag,
   Unlock,
   Lock,
-  Wand2,
-  Bold,
-  Italic,
-  List as ListIcon,
-  ListOrdered,
-  Quote,
-  Code as CodeIcon,
-  Link2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -30,26 +22,34 @@ import { ImageGallery } from '@/components/ui/image-gallery';
 import { timeAgo, roleFlair } from '@/lib/utils';
 import { db } from '@/firebase';
 import { collection, onSnapshot, orderBy, query, serverTimestamp, addDoc, doc, getDoc, updateDoc, deleteDoc, deleteField, limit } from 'firebase/firestore';
-import { storage } from '@/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 
-const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
-
-const TAG_OPTIONS = ['Database', 'Bug', 'Exam', 'Help', 'React', 'Project', 'Idea', 'UI'];
 const SORT_OPTIONS = [
   { value: 'new', label: 'Newest' },
   { value: 'active', label: 'Most Active' },
   { value: 'unanswered', label: 'Unanswered' },
   { value: 'top', label: 'Top' },
 ];
+const TAG_OPTIONS = [
+  'general',
+  'bug',
+  'help',
+  'question',
+  'project',
+  'feedback',
+];
+const FLAIRS = [
+  'Question',
+  'Bug',
+  'Tip',
+  'Solved',
+  'Announcement',
+];
 const MOD_ROLES = ['admin', 'teacher', 'instructor'];
-const COMMUNITY_OPTIONS = ['General', 'React', 'UI', 'Backend', 'Database', 'Exam', 'Help'];
-const FLAIRS = ['Question', 'Discussion', 'Tutorial', 'Bug', 'Idea'];
 const MAX_TITLE = 300;
 
 const STATUS_LABELS = {
@@ -62,54 +62,21 @@ export default function ForumPage() {
   const { user, userData } = useAuth();
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState({ title: '', content: '' });
+  const [postType, setPostType] = useState('text');
+  const [filterTags, setFilterTags] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [flair, setFlair] = useState('');
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [sortBy, setSortBy] = useState('new');
-  const [files, setFiles] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [filterTags, setFilterTags] = useState([]);
   const [isComposerOpen, setComposerOpen] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [similarResults, setSimilarResults] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarSort, setSimilarSort] = useState('relevance'); // relevance | date | popularity
   const [searchCache, setSearchCache] = useState({});
-  const [community, setCommunity] = useState('');
-  const [communityQuery, setCommunityQuery] = useState('');
-  const [nsfw, setNsfw] = useState(false);
-  const [flair, setFlair] = useState('');
-  const [postType, setPostType] = useState('text'); // text | link | media | poll
-  const [suggestedCommunities, setSuggestedCommunities] = useState([]);
   const [sentiment, setSentiment] = useState(null);
   const [violations, setViolations] = useState([]);
-  const [pollOptions, setPollOptions] = useState(["", ""]);
-  const contentInputRef = useRef(null);
-  const applyFormat = useCallback((fmt) => {
-    const el = contentInputRef.current;
-    const val = newPost.content || "";
-    const start = el?.selectionStart ?? val.length;
-    const end = el?.selectionEnd ?? val.length;
-    const sel = val.slice(start, end);
-    let before = val.slice(0, start);
-    let after = val.slice(end);
-    let insert = "";
-    if (fmt === "bold") insert = `**${sel || ""}**`;
-    if (fmt === "italic") insert = `_${sel || ""}_`;
-    if (fmt === "olist") insert = `${sel || "\n1. Item\n2. Item"}`;
-    if (fmt === "ulist") insert = `${sel || "\n- Item\n- Item"}`;
-    if (fmt === "link") insert = sel ? `[${sel}](https://example.com)` : "[text](https://example.com)";
-    if (fmt === "quote") insert = sel ? `\n> ${sel}` : "\n> quoted text";
-    if (fmt === "code") insert = sel ? `\n\`\`${sel}\`\`` : "\n```\ncode\n```";
-    const next = before + insert + after;
-    setNewPost((p) => ({ ...p, content: next }));
-    requestAnimationFrame(() => {
-      if (el) {
-        const caret = before.length + insert.length;
-        el.focus();
-        el.setSelectionRange(caret, caret);
-      }
-    });
-  }, [newPost.content]);
   const analyzeLocal = useCallback(async (q, lim = 8) => {
     const STOPWORDS = new Set(['the','a','an','and','or','but','to','of','in','on','for','with','from','by','is','are','was','were','be','been','it','that','this','as','at','we','you','they','i','he','she','them','us','our','your']);
     const tokenize = (s) => (s || '').toLowerCase().replace(/[`~!@#$%^&*()_+={}\[\]|\\:;"'<>,.?/]/g, ' ').split(/\s+/).filter(Boolean);
@@ -224,7 +191,6 @@ export default function ForumPage() {
     const q = `${newPost.title || ''} ${newPost.content || ''}`.trim();
     if (!q || q.length < 2) {
       setSimilarResults([]);
-      setSuggestedCommunities([]);
       setSentiment(null);
       setViolations([]);
       return;
@@ -237,7 +203,6 @@ export default function ForumPage() {
         if (cached && Date.now() - cached.ts < 60000) {
           if (!cancelled) {
             setSimilarResults(cached.results || []);
-            setSuggestedCommunities(cached.suggested || []);
           }
         } else {
           const res = await fetch('/api/forum/analyze', {
@@ -251,21 +216,13 @@ export default function ForumPage() {
           if (server.length > 0) {
             if (!cancelled) {
               setSimilarResults(server);
-              const counts = Object.create(null);
-              server.forEach((r) => {
-                const tags = Array.isArray(r.tags) ? r.tags : [];
-                tags.forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
-              });
-              const suggested = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k])=>k).slice(0,5);
-              setSuggestedCommunities(suggested);
-              setSearchCache((c) => ({ ...c, [q]: { ts: Date.now(), results: server, suggested } }));
+              setSearchCache((c) => ({ ...c, [q]: { ts: Date.now(), results: server } }));
             }
           } else {
             const local = await analyzeLocal(q, 8);
             if (!cancelled) {
               setSimilarResults(local || []);
-              setSuggestedCommunities([]);
-              setSearchCache((c) => ({ ...c, [q]: { ts: Date.now(), results: local || [], suggested: [] } }));
+              setSearchCache((c) => ({ ...c, [q]: { ts: Date.now(), results: local || [] } }));
             }
           }
         }
@@ -274,7 +231,6 @@ export default function ForumPage() {
           const local = await analyzeLocal(q, 8);
           if (!cancelled) {
             setSimilarResults(local || []);
-            setSuggestedCommunities([]);
           }
         } catch {
           if (!cancelled) setSimilarResults([]);
@@ -289,11 +245,7 @@ export default function ForumPage() {
     };
   }, [newPost.title, newPost.content, searchCache]);
 
-  const filteredCommunities = useMemo(() => {
-    const q = communityQuery.trim().toLowerCase();
-    if (!q) return COMMUNITY_OPTIONS;
-    return COMMUNITY_OPTIONS.filter((c) => c.toLowerCase().includes(q));
-  }, [communityQuery]);
+  
 
   const sentimentScore = useCallback((txt) => {
     const pos = ['great','good','love','awesome','helpful','thanks','cool','nice'];
@@ -312,21 +264,15 @@ export default function ForumPage() {
     if (!q || q.length < 2) { setSentiment(null); setViolations([]); return; }
     setSentiment(sentimentScore(q));
     const issues = [];
-    if (nsfw) issues.push({ type: 'warning', msg: 'Marked NSFW — ensure content follows guidelines' });
     if (q.match(/\b(?:damn|hell|shit)\b/i)) issues.push({ type: 'error', msg: 'Contains profanity' });
     if (q.length < 10) issues.push({ type: 'hint', msg: 'Add more details for better responses' });
     setViolations(issues);
-  }, [newPost.title, newPost.content, nsfw, sentimentScore]);
+  }, [newPost.title, newPost.content, sentimentScore]);
 
   const sortedPosts = useMemo(() => {
-    const byTag = (x) => {
-      if (!filterTags.length) return true;
-      const ts = Array.isArray(x.tags) ? x.tags : [];
-      return filterTags.some((ft) => ts.includes(ft));
-    };
     const answered = (p) => Array.isArray(p.replies) && p.replies.some((r) => MOD_ROLES.includes(r.role));
-    const pinned = posts.filter((p) => p.isPinned && byTag(p));
-    let list = posts.filter((p) => !p.isPinned && byTag(p));
+    const pinned = posts.filter((p) => p.isPinned);
+    let list = posts.filter((p) => !p.isPinned);
     if (sortBy === 'unanswered') {
       list = list.filter((p) => !(Array.isArray(p.replies) && p.replies.length > 0));
     }
@@ -355,24 +301,9 @@ export default function ForumPage() {
       isAnswered: answered(p),
       resolutionStatus: p.resolutionStatus || (answered(p) ? 'in_progress' : 'unanswered'),
     }));
-  }, [posts, sortBy, filterTags]);
+  }, [posts, sortBy]);
 
-  const uploadImages = useCallback(async (files) => {
-    const imageUrls = [];
-    for (const file of files) {
-      try {
-        const key = `posts/${user.uid}/${Date.now()}_${file.name}`;
-        const r = ref(storage, key);
-        await uploadBytes(r, file);
-        const url = await getDownloadURL(r);
-        imageUrls.push(url);
-      } catch (error) {
-        console.error('Image upload failed:', error);
-        alert(`Failed to upload ${file.name}`);
-      }
-    }
-    return imageUrls;
-  }, [user]);
+  
 
   const createPostFallback = useCallback(async (postData) => {
     try {
@@ -419,7 +350,6 @@ export default function ForumPage() {
     
     setLoading(true);
     try {
-      const imageUrls = await uploadImages(files);
       const authorNameResolved = (await getUserName(user.uid)) || '';
       const postData = {
         title: newPost.title.trim(),
@@ -427,13 +357,6 @@ export default function ForumPage() {
         authorId: user.uid,
         authorName: authorNameResolved || userData?.name || user.displayName || (user.email?.split('@')[0] || 'User'),
         role: userData?.role || 'student',
-        images: imageUrls,
-        tags,
-        nsfw,
-        flair,
-        postType,
-        context: community || null,
-        pollOptions: postType === 'poll' ? pollOptions.filter((x)=>x.trim()).slice(0,6) : undefined,
       };
 
       const res = await fetch('/api/forum/create', {
@@ -449,58 +372,25 @@ export default function ForumPage() {
           if (!success) throw new Error('Failed to create post');
         }
       } else {
-        const success = await createPostFallback(postData);
-        if (!success) throw new Error('Failed to create post');
+        let message = 'Failed to create post';
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+        } catch {}
+        throw new Error(message);
       }
 
       // Optimistic UI reset
       setNewPost({ title: '', content: '' });
-      setFiles([]);
-      setTags([]);
-      setCommunity('');
-      setCommunityQuery('');
-      setNsfw(false);
-      setFlair('');
-      setPostType('text');
       setComposerOpen(false);
-      setShowPreview(false);
       // alert('Post created successfully'); // removed success alert to reduce annoyance
     } catch (error) {
       console.error('Post creation failed:', error);
-      const authorNameResolved = (await getUserName(user.uid)) || '';
-      const success = await createPostFallback({
-        title: newPost.title.trim(),
-        content: newPost.content.trim(),
-        authorId: user.uid,
-        authorName: authorNameResolved || userData?.name || user.displayName || (user.email?.split('@')[0] || 'User'),
-        role: userData?.role || 'student',
-        images: [],
-        tags,
-        nsfw,
-        flair,
-        postType,
-        context: community || null,
-        pollOptions: postType === 'poll' ? pollOptions.filter((x)=>x.trim()).slice(0,6) : undefined,
-      });
-      
-      if (success) {
-        setNewPost({ title: '', content: '' });
-        setFiles([]);
-        setTags([]);
-        setCommunity('');
-        setCommunityQuery('');
-        setNsfw(false);
-        setFlair('');
-        setPostType('text');
-        setComposerOpen(false);
-        setShowPreview(false);
-      } else {
-        alert('Failed to create post. Please try again.');
-      }
+      alert(error?.message || 'Failed to create post. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [newPost, files, tags, nsfw, flair, postType, community, user, userData, uploadImages, createPostFallback]);
+  }, [newPost, user, userData, createPostFallback, postType]);
 
   const handlePin = useCallback(async (post) => {
     if (!user) {
@@ -910,30 +800,6 @@ export default function ForumPage() {
               <div className="grid gap-4 md:grid-cols-[2fr_1.2fr]">
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Input
-                        placeholder="Select a community"
-                        aria-label="Select a community"
-                        value={communityQuery}
-                        onChange={(e) => setCommunityQuery(e.target.value)}
-                        className="w-64"
-                      />
-                      <div className="absolute left-0 right-0 z-10 mt-1 w-64 max-h-40 overflow-y-auto rounded-md border bg-white dark:bg-slate-800 shadow-lg transition-all">
-                        {filteredCommunities.map((c) => (
-                          <button
-                            key={c}
-                            className={`w-full text-left px-2 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 ${community===c?'bg-slate-100 dark:bg-slate-700':''}`}
-                            role="option"
-                            onClick={() => { setCommunity(c); setCommunityQuery(c); }}
-                          >
-                            {c}
-                          </button>
-                        ))}
-                        {suggestedCommunities.length > 0 && (
-                          <div className="px-2 py-1 text-[11px] text-slate-500">Suggested: {suggestedCommunities.join(", ")}</div>
-                        )}
-                      </div>
-                    </div>
                     <div className="ml-auto flex items-center gap-2">
                       <span className="text-[11px] text-slate-500">NSFW content is prohibited</span>
                       <select value={flair} onChange={(e)=>setFlair(e.target.value)} className="text-sm border rounded px-2 py-1">
@@ -943,7 +809,7 @@ export default function ForumPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    {['text','media','link','poll'].map((t) => (
+                    {['text','media','link'].map((t) => (
                       <button
                         key={t}
                         className={`px-3 py-1 rounded ${postType===t?'border-b-2 border-indigo-600 font-medium':'text-slate-600'}`}
@@ -953,7 +819,6 @@ export default function ForumPage() {
                         {t === 'text' && <span>Text</span>}
                         {t === 'media' && <span>Images & Video</span>}
                         {t === 'link' && <span>Link</span>}
-                        {t === 'poll' && <span>Poll</span>}
                       </button>
                     ))}
                   </div>
@@ -980,71 +845,35 @@ export default function ForumPage() {
                     })}
                   </div>
                   {postType === 'text' && (
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <span className="text-sm text-slate-500 inline-flex items-center gap-2"><BadgeCheck className="w-4 h-4 text-indigo-500" /> Markdown supported</span>
-                      <button aria-label="Bold" onClick={()=>applyFormat('bold')} className="px-2 py-1 rounded hover:bg-slate-100"><Bold className="w-4 h-4" /></button>
-                      <button aria-label="Italic" onClick={()=>applyFormat('italic')} className="px-2 py-1 rounded hover:bg-slate-100"><Italic className="w-4 h-4" /></button>
-                      <button aria-label="Ordered list" onClick={()=>applyFormat('olist')} className="px-2 py-1 rounded hover:bg-slate-100"><ListOrdered className="w-4 h-4" /></button>
-                      <button aria-label="Unordered list" onClick={()=>applyFormat('ulist')} className="px-2 py-1 rounded hover:bg-slate-100"><ListIcon className="w-4 h-4" /></button>
-                      <button aria-label="Link" onClick={()=>applyFormat('link')} className="px-2 py-1 rounded hover:bg-slate-100"><Link2 className="w-4 h-4" /></button>
-                      <button aria-label="Quote" onClick={()=>applyFormat('quote')} className="px-2 py-1 rounded hover:bg-slate-100"><Quote className="w-4 h-4" /></button>
-                      <button aria-label="Code" onClick={()=>applyFormat('code')} className="px-2 py-1 rounded hover:bg-slate-100"><CodeIcon className="w-4 h-4" /></button>
-                      <Button variant="ghost" size="sm" className="ml-auto gap-2" onClick={() => setShowPreview((p) => !p)}>
-                        <Wand2 className="w-4 h-4" />
-                        {showPreview ? 'Edit' : 'Preview'}
-                      </Button>
+                    <Textarea
+                      rows={10}
+                      placeholder="Body text (optional)"
+                      value={newPost.content}
+                      onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
+                      className="font-mono text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  )}
+                  {postType === 'media' && (
+                    <div
+                      className="rounded-lg border border-dashed border-slate-300 p-6 text-center bg-slate-50 dark:bg-slate-900"
+                      onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e)=>{ e.preventDefault(); const f = Array.from(e.dataTransfer.files || []); setFiles((prev)=>[...prev, ...f]); }}
+                    >
+                      <p className="text-sm text-slate-600">Drag & drop images/videos here or choose files</p>
+                      <div className="mt-3">
+                        <input type="file" accept="image/*,video/*" multiple onChange={(e) => setFiles((prev)=>[...prev, ...Array.from(e.target.files || [])])} />
+                      </div>
+                      {files.length > 0 && (
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {files.slice(0,6).map((f,i)=> (
+                            <div key={i} className="text-[11px] truncate bg-white/60 border rounded px-2 py-1">{f.name}</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {!showPreview ? (
-                    <>
-                      {postType === 'text' && (
-                        <Textarea
-                          rows={10}
-                          placeholder="Body text (optional)"
-                          value={newPost.content}
-                          onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
-                          ref={contentInputRef}
-                          className="font-mono text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      )}
-                      {postType === 'media' && (
-                        <div
-                          className="rounded-lg border border-dashed border-slate-300 p-6 text-center bg-slate-50 dark:bg-slate-900"
-                          onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-                          onDrop={(e)=>{ e.preventDefault(); const f = Array.from(e.dataTransfer.files || []); setFiles((prev)=>[...prev, ...f]); }}
-                        >
-                          <p className="text-sm text-slate-600">Drag & drop images/videos here or choose files</p>
-                          <div className="mt-3">
-                            <input type="file" accept="image/*,video/*" multiple onChange={(e) => setFiles((prev)=>[...prev, ...Array.from(e.target.files || [])])} />
-                          </div>
-                          {files.length > 0 && (
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                              {files.slice(0,6).map((f,i)=> (
-                                <div key={i} className="text-[11px] truncate bg-white/60 border rounded px-2 py-1">{f.name}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {postType === 'link' && (
-                        <Input aria-label="URL" placeholder="https://example.com" value={newPost.content} onChange={(e)=>setNewPost((p)=>({ ...p, content: e.target.value }))} />
-                      )}
-                      {postType === 'poll' && (
-                        <div className="space-y-2">
-                          {pollOptions.map((opt, idx)=> (
-                            <Input key={idx} placeholder={`Option ${idx+1}`} value={opt} onChange={(e)=>setPollOptions((arr)=> arr.map((v,i)=> i===idx ? e.target.value : v))} />
-                          ))}
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={()=> setPollOptions((arr)=> arr.length < 6 ? [...arr, ""] : arr)}>Add option</Button>
-                            <Button size="sm" variant="outline" onClick={()=> setPollOptions((arr)=> arr.length > 2 ? arr.slice(0,-1) : arr)}>Remove option</Button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-900 prose prose-slate dark:prose-invert max-w-none min-h-[240px]">
-                      <ReactMarkdown>{newPost.content || '_Nothing to preview yet_'}</ReactMarkdown>
-                    </div>
+                  {postType === 'link' && (
+                    <Input aria-label="URL" placeholder="https://example.com" value={newPost.content} onChange={(e)=>setNewPost((p)=>({ ...p, content: e.target.value }))} />
                   )}
                   {postType !== 'media' && (
                     <div className="flex items-center gap-3">
@@ -1055,7 +884,7 @@ export default function ForumPage() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => { setComposerOpen(false); setShowPreview(false); }}>Cancel</Button>
+                    <Button variant="outline" onClick={() => { setComposerOpen(false); }}>Cancel</Button>
                     <Button onClick={handleCreate} disabled={loading || (newPost.title?.length || 0) > MAX_TITLE}>
                       {loading ? 'Posting...' : 'Post discussion'}
                     </Button>

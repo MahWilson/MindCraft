@@ -8,9 +8,26 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { title, content, authorId, authorName, role, tags, images, context, nsfw, flair, postType, pollOptions } = body
+    const {
+      title: rawTitle,
+      content: rawContent,
+      authorId: rawAuthorId,
+      authorName: rawAuthorName,
+      role,
+      tags,
+      images,
+      context,
+      nsfw,
+      flair,
+      postType,
+      pollOptions,
+    } = body
+    const title = typeof rawTitle === 'string' ? rawTitle : ''
+    const content = typeof rawContent === 'string' ? rawContent : ''
+    const authorId = typeof rawAuthorId === 'string' ? rawAuthorId : ''
+    const authorName = typeof rawAuthorName === 'string' ? rawAuthorName : ''
     
-    if (!title || !content || !authorId || !authorName) {
+    if (!title.trim() || !authorId.trim() || !authorName.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
     
