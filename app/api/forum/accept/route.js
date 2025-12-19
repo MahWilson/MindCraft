@@ -5,6 +5,10 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 
 export async function PATCH(request) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ fallback: true, message: 'Using client-side Firestore' }, { status: 200 })
+    }
+
     const { postId, replyId, userId, userRole } = await request.json()
     if (!postId || !replyId || !userId) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -45,5 +49,3 @@ export async function PATCH(request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
-
-

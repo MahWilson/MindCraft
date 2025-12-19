@@ -5,6 +5,10 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 
 export async function PATCH(request) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+    }
+
     const { postId, replyId, userId, userRole, markers } = await request.json()
     if (!postId || !replyId || !userId || !markers || typeof markers !== 'object') {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -39,5 +43,3 @@ export async function PATCH(request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
-
-
