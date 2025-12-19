@@ -17,7 +17,8 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Not Found' }, { status: 404 })
     }
     const data = snap.data()
-    const permitted = userRole === 'teacher' || userRole === 'admin'
+    const role = String(userRole || '').toLowerCase()
+    const permitted = role === 'teacher' || role === 'admin'
     if (!permitted) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
