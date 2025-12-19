@@ -7,7 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ClipboardCheck, FileText, Code, Clock, Calendar, Upload, ArrowRight, Edit2, Trash2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
+import { ClipboardCheck, FileText, Code, Clock, Calendar, Upload, ArrowRight, Edit2, Trash2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Plus, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AssessmentsPage() {
@@ -306,6 +306,12 @@ export default function AssessmentsPage() {
 											</Link>
 										) : (
 											<>
+												<Link href={`/assessments/${assessment.id}/submissions`} className="flex-1 min-w-[100px]">
+													<Button variant="outline" className="w-full border-secondary/20 hover:bg-secondary/10 hover:border-secondary/40" size="sm" title="View Submissions">
+														<Users className="h-5 w-5 mr-2 text-secondary" />
+														Submissions
+													</Button>
+												</Link>
 												<Link href={`/assessments/${assessment.id}/edit`} className="flex-1 min-w-[100px]">
 													<Button variant="outline" className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/40" size="sm" title="Edit Assessment">
 														<Edit2 className="h-5 w-5 mr-2 text-primary" />
