@@ -20,8 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { timeAgo, roleFlair } from '@/lib/utils';
-import { db } from '@/firebase';
+import { db, storage } from '@/firebase';
 import { collection, onSnapshot, orderBy, query, serverTimestamp, addDoc, doc, getDoc, updateDoc, deleteDoc, deleteField, limit } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -347,9 +348,31 @@ export default function ForumPage() {
       alert('Please sign in');
       return;
     }
+
+    if (postType === 'media' && (!Array.isArray(files) || files.length === 0)) {
+      alert('Please select at least one image or video');
+      return;
+    }
     
     setLoading(true);
     try {
+      const uploadedImages = [];
+      const uploadedVideos = [];
+      if (Array.isArray(files) && files.length > 0) {
+        const tasks = files.map(async (file) => {
+          const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+          const safeName = String(file?.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = `forum_posts/${user.uid}/${Date.now()}_${id}_${safeName}`;
+          const r = storageRef(storage, path);
+          await uploadBytes(r, file);
+          const url = await getDownloadURL(r);
+          const mime = String(file?.type || '').toLowerCase();
+          if (mime.startsWith('video/')) uploadedVideos.push(url);
+          else uploadedImages.push(url);
+        });
+        await Promise.all(tasks);
+      }
+
       const authorNameResolved = (await getUserName(user.uid)) || '';
       const postData = {
         title: newPost.title.trim(),
@@ -357,6 +380,11 @@ export default function ForumPage() {
         authorId: user.uid,
         authorName: authorNameResolved || userData?.name || user.displayName || (user.email?.split('@')[0] || 'User'),
         role: userData?.role || 'student',
+        tags,
+        flair,
+        postType,
+        images: uploadedImages,
+        videos: uploadedVideos,
       };
 
       const res = await fetch('/api/forum/create', {
@@ -382,6 +410,10 @@ export default function ForumPage() {
 
       // Optimistic UI reset
       setNewPost({ title: '', content: '' });
+      setTags([]);
+      setFiles([]);
+      setFlair('');
+      setPostType('text');
       setComposerOpen(false);
       // alert('Post created successfully'); // removed success alert to reduce annoyance
     } catch (error) {
@@ -390,7 +422,7 @@ export default function ForumPage() {
     } finally {
       setLoading(false);
     }
-  }, [newPost, user, userData, createPostFallback, postType]);
+  }, [newPost, user, userData, createPostFallback, postType, files, tags, flair]);
 
   const handlePin = useCallback(async (post) => {
     if (!user) {
@@ -1053,6 +1085,14 @@ const PostCard = memo(function PostCard({ post, user, isModerator, onVote, onRea
   const reactions = post.reactions || {};
   const reactionCount = useCallback((emoji) => Object.values(reactions).filter((e) => e === emoji).length, [reactions]);
   const instructorReplied = post.isAnswered;
+
+  const imageUrls = useMemo(() => (Array.isArray(post.images) ? post.images.filter((x) => typeof x === 'string' && x.trim()) : []), [post.images]);
+  const videoUrls = useMemo(() => {
+    const fromVideos = Array.isArray(post.videos) ? post.videos : [];
+    const fromImages = Array.isArray(post.images) ? post.images : [];
+    const all = [...fromVideos, ...fromImages].filter((x) => typeof x === 'string' && x.trim());
+    return all.filter((url) => /\.(mp4|webm|ogg)(\?|#|$)/i.test(String(url || '')));
+  }, [post.videos, post.images]);
   
   // Check if post contains code
   const hasCode = post.content && post.content.includes('```');
@@ -1100,6 +1140,17 @@ const PostCard = memo(function PostCard({ post, user, isModerator, onVote, onRea
           <p className="text-xs md:text-sm text-slate-700 dark:text-slate-200 line-clamp-2">
             {plainTextPreview}
           </p>
+
+          {(imageUrls.length > 0 || videoUrls.length > 0) && (
+            <div className="pt-2 space-y-2">
+              {videoUrls.slice(0, 1).map((src) => (
+                <div key={src} className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-black">
+                  <video src={src} controls className="w-full max-h-[520px] object-contain" />
+                </div>
+              ))}
+              {imageUrls.length > 0 && <ImageGallery images={imageUrls} />}
+            </div>
+          )}
 
           {hasCode && (
             <div className="inline-flex items-center rounded bg-slate-900 text-slate-100 text-[11px] px-2 py-1 font-mono">
