@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { db } from "@/firebase";
@@ -21,6 +22,7 @@ import {
   ArrowBigDown,
   Reply,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { CodeBlockPlus } from "@/components/CodeBlockPlus";
 
@@ -103,6 +105,21 @@ export default function TopicPage({ params }) {
   const [notes, setNotes] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
+  const [notesError, setNotesError] = useState("");
+  const [notesHistory, setNotesHistory] = useState([]);
+  const [notesSort, setNotesSort] = useState("newest");
+  const [notesNames, setNotesNames] = useState({});
+  const [headerResolvedName, setHeaderResolvedName] = useState("");
+  const [headerAvatar, setHeaderAvatar] = useState("");
+  const getUserName = useCallback(async (uid) => {
+    try {
+      const snap = await getDoc(doc(db, "user", uid));
+      return snap.exists() ? (snap.data().name || "") : "";
+    } catch {
+      return "";
+    }
+  }, []);
 
   const markdownComponents = useMemo(
     () => ({
@@ -122,6 +139,27 @@ export default function TopicPage({ params }) {
   }, [id]);
 
   useEffect(() => {
+    (async () => {
+      if (!post?.authorId) return;
+      const current = post.authorName || "";
+      try {
+        const snap = await getDoc(doc(db, "user", post.authorId));
+        if (snap.exists()) {
+          const data = snap.data();
+          const nm = data.name || "";
+          const pic = data.profilePicture || "";
+          setHeaderResolvedName(nm || current);
+          if (pic) setHeaderAvatar(pic);
+        } else {
+          setHeaderResolvedName(current);
+        }
+      } catch {
+        setHeaderResolvedName(current);
+      }
+    })();
+  }, [post?.authorId, post?.authorName]);
+
+  useEffect(() => {
     if (!isModerator || !id || notesLoaded) return;
     (async () => {
       try {
@@ -139,9 +177,11 @@ export default function TopicPage({ params }) {
             if (notesSnap.exists()) {
               const notesData = notesSnap.data();
               setNotes(notesData.notes || "");
+              setNotesHistory(Array.isArray(notesData.history) ? notesData.history : []);
             }
           } else {
             setNotes(data.notes || "");
+            setNotesHistory(Array.isArray(data.history) ? data.history : []);
           }
         } else {
           // Fallback to client-side Firestore
@@ -150,6 +190,7 @@ export default function TopicPage({ params }) {
           if (notesSnap.exists()) {
             const notesData = notesSnap.data();
             setNotes(notesData.notes || "");
+            setNotesHistory(Array.isArray(notesData.history) ? notesData.history : []);
           }
         }
       } catch {
@@ -175,6 +216,20 @@ export default function TopicPage({ params }) {
     });
     setReplies(sorted);
   }, [post, sort]);
+  
+  useEffect(() => {
+    (async () => {
+      const uids = Array.from(new Set((Array.isArray(notesHistory) ? notesHistory : []).map((h) => h.updatedBy).filter(Boolean)));
+      for (const uid of uids) {
+        if (notesNames[uid]) continue;
+        try {
+          const snap = await getDoc(doc(db, "user", uid));
+          const nm = snap.exists() ? (snap.data().name || "") : "";
+          if (nm) setNotesNames((m) => ({ ...m, [uid]: nm }));
+        } catch {}
+      }
+    })();
+  }, [notesHistory, notesNames]);
 
   const tree = useMemo(() => {
     const byId = Object.create(null);
@@ -204,13 +259,14 @@ export default function TopicPage({ params }) {
     const contentToSend = text.trim();
     setText(""); // Clear input immediately for better UX
     try {
+      const authorNameResolved = (await getUserName(user.uid)) || "";
       const res = await fetch("/api/forum/reply-enhanced", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           postId: id,
           authorId: user.uid,
-          authorName: user.displayName || "Anonymous",
+          authorName: authorNameResolved || user.displayName || (user.email?.split("@")[0] || "User"),
           role: userData?.role || "student",
           content: contentToSend,
         }),
@@ -278,10 +334,11 @@ export default function TopicPage({ params }) {
       }
       const data = snap.data();
       const arr = Array.isArray(data.replies) ? data.replies : [];
+      const authorNameResolved = (await getUserName(user.uid)) || "";
       const newReply = {
         id: crypto.randomUUID(),
         authorId: user.uid,
-        authorName: user.displayName || "Anonymous",
+        authorName: authorNameResolved || user.displayName || (user.email?.split("@")[0] || "User"),
         role: userData?.role || "student",
         content: content.trim(),
         createdAt: new Date(),
@@ -353,13 +410,14 @@ export default function TopicPage({ params }) {
     if (!msg) return alert("Enter a reply");
     if (!user) return alert("Please sign in");
     try {
+      const authorNameResolved = (await getUserName(user.uid)) || "";
       const res = await fetch("/api/forum/reply-enhanced", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           postId: id,
           authorId: user.uid,
-          authorName: user.displayName || "Anonymous",
+          authorName: authorNameResolved || user.displayName || (user.email?.split("@")[0] || "User"),
           role: userData?.role || "student",
           content: msg,
           parentReplyId: parentId,
@@ -461,10 +519,10 @@ export default function TopicPage({ params }) {
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
-                  <Avatar name={post.authorName} className="w-10 h-10" />
+                  <Avatar src={headerAvatar || undefined} name={headerResolvedName || post.authorName || ""} className="w-10 h-10" />
                   <div>
                     <div className="text-xs text-slate-500">
-                      Posted by {post.authorName || "Anonymous"}
+                      Posted by {headerResolvedName || post.authorName || "User"}
                     </div>
                     <div className="flex items-center gap-2">
                       {(() => {
@@ -546,7 +604,7 @@ export default function TopicPage({ params }) {
                     size="sm"
                     variant={post.isExamRelevant ? "default" : "outline"}
                     onClick={async () => {
-                      await fetch("/api/forum/exam", {
+                      const res = await fetch("/api/forum/exam", {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -556,6 +614,24 @@ export default function TopicPage({ params }) {
                           isExamRelevant: !post.isExamRelevant,
                         }),
                       });
+                      if (res.ok) {
+                        const data = await res.json();
+                        // optimistic UI: update local post flag
+                        setPost((p) => ({ ...p, isExamRelevant: data.isExamRelevant }));
+                        if (data.fallback) {
+                          try {
+                            await updateDoc(doc(db, "post", post.id), { isExamRelevant: data.isExamRelevant });
+                          } catch {}
+                        }
+                      } else {
+                        const err = await res.json().catch(() => ({}));
+                        try {
+                          await updateDoc(doc(db, "post", post.id), { isExamRelevant: !post.isExamRelevant });
+                          setPost((p) => ({ ...p, isExamRelevant: !post.isExamRelevant }));
+                        } catch {
+                          alert(err?.error || "Failed to update exam relevance");
+                        }
+                      }
                     }}
                   >
                     {post.isExamRelevant ? "Unset exam relevant" : "Mark exam relevant"}
@@ -565,7 +641,8 @@ export default function TopicPage({ params }) {
                       size="sm"
                       variant="outline"
                       onClick={async () => {
-                        await fetch("/api/forum/promote", {
+                        if (!confirm("Promote this post to the Knowledge Base?")) return;
+                        const res = await fetch("/api/forum/promote", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -574,6 +651,25 @@ export default function TopicPage({ params }) {
                             userRole: userData?.role,
                           }),
                         });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setPost((p) => ({ ...p, isInKnowledgeBase: true }));
+                          if (data.fallback) {
+                            try {
+                              await updateDoc(doc(db, "post", post.id), { isInKnowledgeBase: true });
+                            } catch {}
+                          }
+                          alert("Promoted to Knowledge Base");
+                        } else {
+                          const err = await res.json().catch(() => ({}));
+                          try {
+                            await updateDoc(doc(db, "post", post.id), { isInKnowledgeBase: true });
+                            setPost((p) => ({ ...p, isInKnowledgeBase: true }));
+                            alert("Promoted to Knowledge Base");
+                          } catch {
+                            alert(err?.error || "Failed to promote");
+                          }
+                        }
                       }}
                     >
                       Promote to Knowledge Base
@@ -648,13 +744,23 @@ export default function TopicPage({ params }) {
             <div className="text-sm text-slate-600">
               {Array.isArray(post?.replies) ? post.replies.length : 0} Comments
             </div>
-            <div className="flex gap-2">
-              <Button variant={sort === "new" ? "default" : "outline"} onClick={() => setSort("new")}>
-                Newest
-              </Button>
-              <Button variant={sort === "top" ? "default" : "outline"} onClick={() => setSort("top")}>
-                Top
-              </Button>
+            <div className="shrink-0 w-full max-w-[280px] sm:max-w-[320px]">
+              <div className="flex gap-2 justify-end px-2 py-1">
+                <Button
+                  variant={sort === "new" ? "default" : "outline"}
+                  onClick={() => setSort("new")}
+                  className="px-3"
+                >
+                  Newest
+                </Button>
+                <Button
+                  variant={sort === "top" ? "default" : "outline"}
+                  onClick={() => setSort("top")}
+                  className="px-3"
+                >
+                  Top
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -698,15 +804,15 @@ export default function TopicPage({ params }) {
         <aside className="mt-10 md:mt-0 space-y-4">
           <TimelineRail post={post} replies={replies} />
           {isModerator && (
-            <Card className="p-4 bg-slate-50/70 dark:bg-slate-800/80">
+            <Card className="p-4 bg-slate-50/70 dark:bg-slate-800/80 min-h-[260px]">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Instructor notes
                 </p>
               </div>
               <Textarea
-                rows={6}
-                className="text-xs"
+                rows={8}
+                className="text-xs rounded-md border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 min-h-[160px]"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Private notes for instructors only. Summarize misconceptions, follow-ups, or exam hints."
@@ -717,6 +823,8 @@ export default function TopicPage({ params }) {
                   onClick={async () => {
                     if (!user) return;
                     setNotesSaving(true);
+                    setNotesSaved(false);
+                    setNotesError("");
                     try {
                       const res = await fetch("/api/forum/notes", {
                         method: "PATCH",
@@ -731,47 +839,66 @@ export default function TopicPage({ params }) {
                       if (res.ok) {
                         const data = await res.json();
                         if (data.fallback) {
-                          // API returned fallback flag - use client-side Firestore
                           const notesRef = doc(db, "instructor_notes", post.id);
+                          const snap = await getDoc(notesRef);
+                          const prev = snap.exists() ? (Array.isArray(snap.data().history) ? snap.data().history : []) : [];
+                          const entry = { notes, updatedAt: new Date(), updatedBy: user.uid };
                           await setDoc(
                             notesRef,
                             {
                               notes,
-                              updatedAt: new Date(),
+                              updatedAt: entry.updatedAt,
                               updatedBy: user.uid,
+                              history: [...prev, entry],
                             },
                             { merge: true }
                           );
                         }
+                        setNotesSaved(true);
+                        setTimeout(() => setNotesSaved(false), 2000);
+                        const localEntry = { notes, updatedAt: new Date(), updatedBy: user.uid };
+                        setNotesHistory((h) => [...h, localEntry]);
                       } else {
-                        // Fallback to client-side Firestore
                         const notesRef = doc(db, "instructor_notes", post.id);
+                        const snap = await getDoc(notesRef);
+                        const prev = snap.exists() ? (Array.isArray(snap.data().history) ? snap.data().history : []) : [];
+                        const entry = { notes, updatedAt: new Date(), updatedBy: user.uid };
                         await setDoc(
                           notesRef,
                           {
                             notes,
-                            updatedAt: new Date(),
+                            updatedAt: entry.updatedAt,
                             updatedBy: user.uid,
+                            history: [...prev, entry],
                           },
                           { merge: true }
                         );
+                        setNotesSaved(true);
+                        setTimeout(() => setNotesSaved(false), 2000);
+                        setNotesHistory((h) => [...h, { notes, updatedAt: new Date(), updatedBy: user.uid }]);
                       }
                     } catch (err) {
-                      // Fallback to client-side Firestore on error
                       try {
                         const notesRef = doc(db, "instructor_notes", post.id);
+                        const snap = await getDoc(notesRef);
+                        const prev = snap.exists() ? (Array.isArray(snap.data().history) ? snap.data().history : []) : [];
+                        const entry = { notes, updatedAt: new Date(), updatedBy: user.uid };
                         await setDoc(
                           notesRef,
                           {
                             notes,
-                            updatedAt: new Date(),
+                            updatedAt: entry.updatedAt,
                             updatedBy: user.uid,
+                            history: [...prev, entry],
                           },
                           { merge: true }
                         );
+                        setNotesSaved(true);
+                        setTimeout(() => setNotesSaved(false), 2000);
+                        setNotesHistory((h) => [...h, { notes, updatedAt: new Date(), updatedBy: user.uid }]);
                       } catch (fallbackErr) {
                         console.error("Failed to save notes:", fallbackErr);
-                        alert("Failed to save notes. Please try again.");
+                        setNotesError("Failed to save notes. Please try again.");
                       }
                     } finally {
                       setNotesSaving(false);
@@ -781,6 +908,91 @@ export default function TopicPage({ params }) {
                 >
                   {notesSaving ? "Saving..." : "Save notes"}
                 </Button>
+                {notesSaved && <span className="ml-2 text-[11px] text-emerald-600">Saved</span>}
+              </div>
+              {notesError && <div className="mt-2 text-[11px] text-red-600">{notesError}</div>}
+            </Card>
+          )}
+          {isModerator && (
+            <Card className="p-4 bg-white/80 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm max-w-[400px] w-full">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Notes history
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={notesSort === "newest" ? "default" : "outline"}
+                    onClick={() => setNotesSort("newest")}
+                  >
+                    Newest
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={notesSort === "oldest" ? "default" : "outline"}
+                    onClick={() => setNotesSort("oldest")}
+                  >
+                    Oldest
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {[...notesHistory]
+                  .sort((a, b) => {
+                    const ta = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : new Date(a.updatedAt).getTime();
+                    const tb = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : new Date(b.updatedAt).getTime();
+                    return notesSort === "oldest" ? ta - tb : tb - ta;
+                  })
+                  .map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-md border border-slate-200 dark:border-slate-700 p-3 bg-white/80 dark:bg-slate-800/80 shadow-xs hover:shadow-sm transition max-w-[380px]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-600">
+                          {new Date(item.updatedAt?.toMillis ? item.updatedAt.toMillis() : item.updatedAt).toLocaleString()}
+                        </span>
+                        <span className="text-[11px] text-slate-600">
+                          {item.updatedBy && notesNames[item.updatedBy] ? notesNames[item.updatedBy] : "Instructor"}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-5 overflow-x-auto pr-1">
+                        {item.notes}
+                      </div>
+                      <div className="mt-2 flex justify-end">
+                        {isModerator && (
+                          <button
+                            type="button"
+                            className="w-5 h-5 p-0 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-red-600 hover:border-red-200 flex items-center justify-center transition"
+                            onClick={async () => {
+                              if (!confirm("Delete this note entry?")) return;
+                              try {
+                                const params = new URLSearchParams({
+                                  postId: post.id,
+                                  userId: user?.uid || "",
+                                  userRole: userData?.role || "",
+                                  entryIndex: String(idx),
+                                });
+                                const res = await fetch(`/api/forum/notes/delete?${params.toString()}`, {
+                                  method: "DELETE",
+                                });
+                                if (res.ok) {
+                                  setNotesHistory((h) => h.filter((_, i) => i !== idx));
+                                } else {
+                                  const err = await res.json().catch(() => ({}));
+                                  alert(err?.error || "Failed to delete note");
+                                }
+                              } catch {
+                                alert("Failed to delete note");
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
               </div>
             </Card>
           )}
@@ -855,6 +1067,27 @@ function ReplyNode({
   const [editText, setEditText] = useState(r.content || "");
   const { user, userData } = useAuth();
   const isModerator = MOD_ROLES.includes(userData?.role);
+  const [resolvedName, setResolvedName] = useState("");
+  const [resolvedAvatar, setResolvedAvatar] = useState("");
+  useEffect(() => {
+    (async () => {
+      if (!r?.authorId) return;
+      const current = r.authorName || "";
+      if (current && current !== "Anonymous" && current !== "User") {
+        setResolvedName(current);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, "user", r.authorId));
+        if (snap.exists()) {
+          const nm = snap.data().name || "";
+          const pic = snap.data().profilePicture || "";
+          if (nm) setResolvedName(nm);
+          if (pic) setResolvedAvatar(pic);
+        }
+      } catch {}
+    })();
+  }, [r?.authorId, r?.authorName]);
 
   const hasChildren = r.children && r.children.length > 0;
   const isOpen = expanded[r.id] ?? true;
@@ -938,9 +1171,9 @@ function ReplyNode({
         </div>
         <div className="flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Avatar name={r.authorName} className="w-7 h-7" />
+            <Avatar src={resolvedAvatar || undefined} name={resolvedName || r.authorName || ""} className="w-7 h-7" />
             <span className="font-medium text-slate-900 dark:text-white">
-              {r.authorName || "Anonymous"}
+              {resolvedName || r.authorName || "User"}
             </span>
             {(() => {
               const f = roleFlair(r.role);
@@ -1154,79 +1387,81 @@ function IconButton({ icon, label, onClick }) {
 function TimelineRail({ post, replies }) {
   const all = Array.isArray(replies) ? replies : [];
   if (!post) return null;
-  const items = [
-    {
-      id: post.id,
-      type: "post",
-      label: "Thread created",
-      createdAt: post.createdAt,
-    },
-    ...all.map((r) => ({
-      id: r.id,
-      type: "reply",
-      label: r.authorName || "Reply",
-      createdAt: r.createdAt,
-    })),
-  ].sort((a, b) => {
-    const ta = a.createdAt?.toMillis
-      ? a.createdAt.toMillis()
-      : new Date(a.createdAt).getTime();
-    const tb = b.createdAt?.toMillis
-      ? b.createdAt.toMillis()
-      : new Date(b.createdAt).getTime();
-    return ta - tb;
-  });
-
-  if (items.length <= 1) return null;
-
-  const first = items[0].createdAt;
-  const last = items[items.length - 1].createdAt;
-  const minTime = first?.toMillis ? first.toMillis() : new Date(first).getTime();
-  const maxTime = last?.toMillis ? last.toMillis() : new Date(last).getTime();
-  const span = Math.max(maxTime - minTime, 1);
-
+  const byId = Object.create(null);
+  all.forEach((r) => (byId[r.id] = r));
+  const list = all
+    .map((r) => {
+      let depth = 0;
+      let p = r.parentReplyId;
+      while (p && byId[p]) {
+        depth += 1;
+        p = byId[p].parentReplyId;
+      }
+      return { ...r, depth };
+    })
+    .sort((a, b) => {
+      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+      return ta - tb;
+    });
   return (
-    <Card className="p-4 bg-white/80 dark:bg-slate-800/80">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 mb-2">
-        Timeline
-      </p>
-      <div className="relative h-40">
+    <Card className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm h-[55vh] overflow-y-auto scroll-smooth">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Timeline</p>
+        <button
+          type="button"
+          className="text-[11px] text-indigo-600 hover:underline"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
+          Go to top
+        </button>
+      </div>
+      <div className="relative">
         <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
-        {items.map((item) => {
-          const t = item.createdAt?.toMillis
-            ? item.createdAt.toMillis()
-            : new Date(item.createdAt).getTime();
-          const offset = ((t - minTime) / span) * 100;
-          const isPost = item.type === "post";
-  return (
-            <button
-              key={item.id}
-              type="button"
-              className="absolute left-0 flex items-center gap-2 text-left group"
-              style={{ top: `${offset}%`, transform: "translateY(-50%)" }}
-              onClick={() => {
-                if (isPost) {
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                  return;
-                }
-                const el = document.getElementById(`reply-${item.id}`);
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
-            >
-              <span
-                className={`ml-1 h-2.5 w-2.5 rounded-full border ${
-                  isPost
-                    ? "bg-indigo-500 border-indigo-600"
-                    : "bg-slate-100 border-slate-400 group-hover:bg-emerald-400 group-hover:border-emerald-500"
-                }`}
-              />
-              <span className="text-[10px] text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-100 max-w-[160px] truncate">
-                {isPost ? "Thread created" : item.label}
-              </span>
-            </button>
-          );
-        })}
+        <div className="space-y-3">
+          <div className="group flex items-center gap-2 pl-4">
+            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 shadow-sm" />
+            <span className="text-[11px] text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 transition">
+              Thread created • {timeAgo(post.createdAt)}
+            </span>
           </div>
+          {list.map((r) => {
+            const t = r.createdAt?.toMillis ? r.createdAt.toMillis() : new Date(r.createdAt).getTime();
+            const isInstructor = ["teacher", "instructor", "admin"].includes(r.role);
+            const isAccepted = post.acceptedReplyId === r.id;
+            return (
+              <div key={r.id} className="group flex items-center gap-2 pl-4">
+                <span className={`h-2.5 w-2.5 rounded-full ${isAccepted ? "bg-emerald-500" : isInstructor ? "bg-indigo-500" : "bg-slate-400"} shadow-sm`} />
+                <div className="flex-1 flex items-center gap-2">
+                  <span className="text-[11px] text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 transition">
+                    {r.authorName || "Reply"} • {new Date(t).toLocaleString()}
+                  </span>
+                  {isInstructor && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Instructor
+                    </span>
+                  )}
+                  {isAccepted && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Accepted
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="ml-auto text-[10px] text-indigo-600 hover:underline"
+                  onClick={() => {
+                    const el = document.getElementById(`reply-${r.id}`);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                >
+                  View
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </Card>
   );
 }

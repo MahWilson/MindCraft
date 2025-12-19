@@ -8,13 +8,33 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { title, content, authorId, authorName, role, tags, images, context } = body
+    const { title, content, authorId, authorName, role, tags, images, context, nsfw, flair, postType, pollOptions } = body
     
-    // Validate required fields
     if (!title || !content || !authorId || !authorName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
     
+    const tokenize = (s) => (s || '').toLowerCase().replace(/[`~!@#$%^&*()_+={}\[\]|\\:;"'<>,.?/]/g, ' ').split(/\s+/).filter(Boolean)
+    const filterTokens = (tokens) => tokens.filter(t => t.length > 1)
+    const buildBigrams = (tokens) => {
+      const big = []
+      for (let i = 0; i < tokens.length - 1; i++) big.push(tokens[i] + ' ' + tokens[i+1])
+      return big
+    }
+    const tTokens = filterTokens(tokenize(title))
+    const cTokens = filterTokens(tokenize(content))
+    const indexTokens = Array.from(new Set([...tTokens, ...cTokens]))
+    const indexBigrams = Array.from(new Set(buildBigrams([...tTokens, ...cTokens])))
+
+    const prohibited = ['nsfw','porn','sex','nude','explicit','xxx','adult','hate','racist','homophobic','terror','violence']
+    const lc = (title + ' ' + content).toLowerCase()
+    if (nsfw === true) {
+      return NextResponse.json({ error: 'NSFW content is prohibited' }, { status: 422 })
+    }
+    if (prohibited.some(w => lc.includes(w))) {
+      return NextResponse.json({ error: 'Content violates community guidelines' }, { status: 422 })
+    }
+
     const now = new Date()
     const postData = {
       title: title.trim(),
@@ -35,6 +55,14 @@ export async function POST(request) {
       context: context || null,
       isExamRelevant: false,
       isInKnowledgeBase: false,
+      nsfw: !!nsfw,
+      flair: typeof flair === 'string' ? flair : '',
+      postType: typeof postType === 'string' ? postType : 'text',
+      pollOptions: Array.isArray(pollOptions) ? pollOptions.filter(x => typeof x === 'string' && x.trim()).slice(0, 6) : [],
+      searchIndex: {
+        tokens: indexTokens,
+        bigrams: indexBigrams,
+      },
     }
     
     const docRef = await adminDb.collection('post').add(postData)

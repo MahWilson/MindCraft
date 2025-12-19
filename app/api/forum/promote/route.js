@@ -6,7 +6,14 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 export async function POST(request) {
   try {
     if (!adminDb) {
-      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+      const { postId, userId, userRole } = await request.json().catch(() => ({}))
+      if (!postId || !userId) {
+        return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+      }
+      if (!MOD_ROLES.includes(userRole)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+      return NextResponse.json({ success: true, knowledgeBaseId: null, fallback: true, message: 'Using client-side Firestore' }, { status: 200 })
     }
 
     const { postId, userId, userRole } = await request.json()
