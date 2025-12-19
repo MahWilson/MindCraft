@@ -967,17 +967,37 @@ export default function TopicPage({ params }) {
                             onClick={async () => {
                               if (!confirm("Delete this note entry?")) return;
                               try {
+                                const displayed = [...notesHistory].sort((a, b) => {
+                                  const ta = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : new Date(a.updatedAt).getTime();
+                                  const tb = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : new Date(b.updatedAt).getTime();
+                                  return notesSort === "oldest" ? ta - tb : tb - ta;
+                                });
+                                const entry = displayed[idx];
+                                const entryIndex = entry ? notesHistory.indexOf(entry) : idx;
+
                                 const params = new URLSearchParams({
                                   postId: post.id,
                                   userId: user?.uid || "",
-                                  userRole: userData?.role || "",
-                                  entryIndex: String(idx),
+                                  userRole: String(userData?.role || "").toLowerCase(),
+                                  entryIndex: String(entryIndex),
                                 });
                                 const res = await fetch(`/api/forum/notes/delete?${params.toString()}`, {
                                   method: "DELETE",
                                 });
                                 if (res.ok) {
-                                  setNotesHistory((h) => h.filter((_, i) => i !== idx));
+                                  const data = await res.json().catch(() => ({}));
+                                  if (data?.fallback) {
+                                    const notesRef = doc(db, "instructor_notes", post.id);
+                                    const snap = await getDoc(notesRef);
+                                    if (snap.exists()) {
+                                      const history = Array.isArray(snap.data().history) ? snap.data().history : [];
+                                      if (Number.isInteger(entryIndex) && entryIndex >= 0 && entryIndex < history.length) {
+                                        const next = history.slice(0, entryIndex).concat(history.slice(entryIndex + 1));
+                                        await setDoc(notesRef, { history: next }, { merge: true });
+                                      }
+                                    }
+                                  }
+                                  setNotesHistory((h) => h.filter((_, i) => i !== entryIndex));
                                 } else {
                                   const err = await res.json().catch(() => ({}));
                                   alert(err?.error || "Failed to delete note");

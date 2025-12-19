@@ -6,14 +6,14 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 export async function DELETE(request) {
   try {
     if (!adminDb) {
-      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+      return NextResponse.json({ success: true, fallback: true, message: 'Using client-side Firestore' })
     }
 
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
     const entryIndexStr = searchParams.get('entryIndex')
     const userId = searchParams.get('userId')
-    const userRole = searchParams.get('userRole') || ''
+    const userRole = String(searchParams.get('userRole') || '').toLowerCase()
 
     if (!postId || !userId) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
