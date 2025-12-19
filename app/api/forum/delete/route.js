@@ -3,6 +3,10 @@ import { adminDb } from '@/lib/admin'
 
 export async function POST(request) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+    }
+
     const { postId, userId, userRole, reason } = await request.json()
     if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
     const dataSnap = await adminDb.collection('post').doc(postId).get()

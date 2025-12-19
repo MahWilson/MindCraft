@@ -5,6 +5,10 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 
 export async function POST(request) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+    }
+
     const { postId, userId, userRole } = await request.json()
     if (!postId || !userId) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -40,5 +44,3 @@ export async function POST(request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
-
-

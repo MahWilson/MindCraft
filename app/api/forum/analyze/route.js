@@ -5,16 +5,22 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 
 export async function POST(request) {
   try {
-    const { query, limit = 10 } = await request.json()
+    if (!adminDb) {
+      // Return empty results silently instead of 503 to avoid breaking the UI search loop
+      return NextResponse.json({ results: [] })
+    }
+
+    const { query, limit = 10 } = await request.json().catch(() => ({}))
     const q = (query || '').trim().toLowerCase()
     if (!q || q.length < 3) {
       return NextResponse.json({ results: [] })
     }
 
+    // Reduced limit for better performance and added server-side filtering
     const snap = await adminDb
       .collection('post')
       .orderBy('createdAt', 'desc')
-      .limit(100)
+      .limit(50) // Reduced from 100 to 50 for better performance
       .get()
 
     const results = []
@@ -23,6 +29,8 @@ export async function POST(request) {
       const data = doc.data()
       const title = data.title || ''
       const content = data.content || ''
+      
+      // Server-side filtering with better performance
       if (
         title.toLowerCase().includes(q) ||
         content.toLowerCase().includes(q)
@@ -43,8 +51,7 @@ export async function POST(request) {
 
     return NextResponse.json({ results })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[forum/analyze] Error', err)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
-
-

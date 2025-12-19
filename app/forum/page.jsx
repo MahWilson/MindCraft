@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, memo, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -62,6 +62,18 @@ export default function ForumPage() {
   const [similarResults, setSimilarResults] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const isModerator = MOD_ROLES.includes(userData?.role);
+
+  // Lock body scroll when composer is open
+  useEffect(() => {
+    if (isComposerOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isComposerOpen]);
 
   useEffect(() => {
     const q = query(collection(db, 'post'), orderBy('createdAt', 'desc'));
@@ -139,62 +151,27 @@ export default function ForumPage() {
     }));
   }, [posts, sortBy, filterTags]);
 
-  const handleCreate = async () => {
-    if (!newPost.title.trim() || !newPost.content.trim()) return alert('Please provide a title and content');
-    if (!user) return alert('Please sign in');
-    setLoading(true);
-    try {
-      const imageUrls = [];
-      for (const file of files) {
+  const uploadImages = useCallback(async (files) => {
+    const imageUrls = [];
+    for (const file of files) {
+      try {
         const key = `posts/${user.uid}/${Date.now()}_${file.name}`;
         const r = ref(storage, key);
         await uploadBytes(r, file);
         const url = await getDownloadURL(r);
         imageUrls.push(url);
+      } catch (error) {
+        console.error('Image upload failed:', error);
+        alert(`Failed to upload ${file.name}`);
       }
-      const res = await fetch('/api/forum/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newPost.title,
-          content: newPost.content,
-          authorId: user.uid,
-          authorName: user.displayName || 'Anonymous',
-          role: userData?.role || 'student',
-          images: imageUrls,
-          tags,
-        }),
-      });
-      if (!res.ok) {
-        await addDoc(collection(db, 'post'), {
-          title: newPost.title,
-          content: newPost.content,
-          authorId: user.uid,
-          authorName: user.displayName || 'Anonymous',
-          role: userData?.role || 'student',
-          createdAt: serverTimestamp(),
-          isPinned: false,
-          isLocked: false,
-          reactions: {},
-          votes: {},
-          score: 0,
-          replies: [],
-          images: imageUrls,
-          tags,
-        });
-      }
-      setNewPost({ title: '', content: '' });
-      setFiles([]);
-      setTags([]);
-      setComposerOpen(false);
-      setShowPreview(false);
-    } catch (err) {
+    }
+    return imageUrls;
+  }, [user]);
+
+  const createPostFallback = useCallback(async (postData) => {
+    try {
       await addDoc(collection(db, 'post'), {
-        title: newPost.title,
-        content: newPost.content,
-        authorId: user.uid,
-        authorName: user.displayName || 'Anonymous',
-        role: userData?.role || 'student',
+        ...postData,
         createdAt: serverTimestamp(),
         isPinned: false,
         isLocked: false,
@@ -202,84 +179,203 @@ export default function ForumPage() {
         votes: {},
         score: 0,
         replies: [],
-        images: [],
-        tags,
       });
+      return true;
+    } catch (error) {
+      console.error('Fallback post creation failed:', error);
+      return false;
+    }
+  }, []);
+
+  const handleCreate = useCallback(async () => {
+    if (!newPost.title.trim() || !newPost.content.trim()) {
+      alert('Please provide a title and content');
+      return;
+    }
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const imageUrls = await uploadImages(files);
+      const postData = {
+        title: newPost.title.trim(),
+        content: newPost.content.trim(),
+        authorId: user.uid,
+        authorName: user.displayName || 'Anonymous',
+        role: userData?.role || 'student',
+        images: imageUrls,
+        tags,
+      };
+
+      const res = await fetch('/api/forum/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postData),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.fallback) {
+          const success = await createPostFallback(postData);
+          if (!success) throw new Error('Failed to create post');
+        }
+      } else {
+        const success = await createPostFallback(postData);
+        if (!success) throw new Error('Failed to create post');
+      }
+
+      // Optimistic UI reset
       setNewPost({ title: '', content: '' });
       setFiles([]);
       setTags([]);
       setComposerOpen(false);
       setShowPreview(false);
+      // alert('Post created successfully'); // removed success alert to reduce annoyance
+    } catch (error) {
+      console.error('Post creation failed:', error);
+      const success = await createPostFallback({
+        title: newPost.title.trim(),
+        content: newPost.content.trim(),
+        authorId: user.uid,
+        authorName: user.displayName || 'Anonymous',
+        role: userData?.role || 'student',
+        images: [],
+        tags,
+      });
+      
+      if (success) {
+        setNewPost({ title: '', content: '' });
+        setFiles([]);
+        setTags([]);
+        setComposerOpen(false);
+        setShowPreview(false);
+      } else {
+        alert('Failed to create post. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [newPost, files, tags, user, userData, uploadImages, createPostFallback]);
 
-  const handlePin = async (post) => {
-    if (!user) return alert('Please sign in');
-    if (!isModerator) return alert('Only teachers/admins can pin');
+  const handlePin = useCallback(async (post) => {
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
+    if (!isModerator) {
+      alert('Only teachers/admins can pin posts');
+      return;
+    }
+
     try {
       const res = await fetch('/api/forum/pin', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role }),
       });
+
       if (!res.ok) {
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
         const current = !!snap.data().isPinned;
         await updateDoc(pRef, { isPinned: !current });
       }
-    } catch (err) {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      const current = !!snap.data().isPinned;
-      await updateDoc(pRef, { isPinned: !current });
+    } catch (error) {
+      console.error('Pin operation failed:', error);
+      try {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        const current = !!snap.data().isPinned;
+        await updateDoc(pRef, { isPinned: !current });
+      } catch (fallbackError) {
+        alert('Failed to pin/unpin post');
+      }
     }
-  };
+  }, [user, isModerator, userData]);
 
-  const handleLock = async (post) => {
-    if (!user) return alert('Please sign in');
-    if (!isModerator) return alert('Only teachers/admins can lock');
+  const handleLock = useCallback(async (post) => {
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
+    if (!isModerator) {
+      alert('Only teachers/admins can lock posts');
+      return;
+    }
+
     try {
       const res = await fetch('/api/forum/lock', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role }),
       });
+
       if (!res.ok) {
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
         const current = !!snap.data().isLocked;
         await updateDoc(pRef, { isLocked: !current });
       }
-    } catch {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      const current = !!snap.data().isLocked;
-      await updateDoc(pRef, { isLocked: !current });
+    } catch (error) {
+      console.error('Lock operation failed:', error);
+      try {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        const current = !!snap.data().isLocked;
+        await updateDoc(pRef, { isLocked: !current });
+      } catch (fallbackError) {
+        alert('Failed to lock/unlock post');
+      }
     }
-  };
+  }, [user, isModerator, userData]);
 
-  const handleDelete = async (post) => {
-    if (!user) return alert('Please sign in');
+  const handleDelete = useCallback(async (post) => {
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
     if (!confirm('Delete this post?')) return;
+    
     const isOwner = post.authorId === user.uid;
-    if (!isModerator && !isOwner) return alert('Only teachers/admins or the post author can delete');
+    if (!isModerator && !isOwner) {
+      alert('Only teachers/admins or the post author can delete');
+      return;
+    }
+
     try {
       const res = await fetch('/api/forum/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: post.id, userId: user.uid, userRole: userData?.role, reason: '' }),
       });
+
       if (!res.ok) {
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        
         await addDoc(collection(db, 'audit_log'), {
           action: 'DELETE_POST',
           postId: post.id,
@@ -291,84 +387,181 @@ export default function ForumPage() {
         });
         await deleteDoc(pRef);
       }
-    } catch (err) {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      await addDoc(collection(db, 'audit_log'), {
-        action: 'DELETE_POST',
-        postId: post.id,
-        deletedContent: snap.data(),
-        deletedBy: user.uid,
-        reason: '',
-        timeStamp: serverTimestamp(),
-        replyId: '',
-      });
-      await deleteDoc(pRef);
+      
+      // alert('Post deleted successfully');
+    } catch (error) {
+      console.error('Delete operation failed:', error);
+      try {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        
+        await addDoc(collection(db, 'audit_log'), {
+          action: 'DELETE_POST',
+          postId: post.id,
+          deletedContent: snap.data(),
+          deletedBy: user.uid,
+          reason: '',
+          timeStamp: serverTimestamp(),
+          replyId: '',
+        });
+        await deleteDoc(pRef);
+      } catch (fallbackError) {
+        alert('Failed to delete post');
+      }
     }
-  };
+  }, [user, isModerator, userData]);
 
-  const handleReact = async (post, emoji) => {
-    if (!user) return alert('Please sign in');
+  const handleReact = useCallback(async (post, emoji) => {
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
+
     try {
       const res = await fetch('/api/forum/react', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: post.id, userId: user.uid, emoji }),
       });
+
       if (!res.ok) {
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
         const current = snap.data().reactions?.[user.uid] || null;
-        if (current === emoji) await updateDoc(pRef, { [`reactions.${user.uid}`]: deleteField() });
-        else await updateDoc(pRef, { [`reactions.${user.uid}`]: emoji });
+        if (current === emoji) {
+          await updateDoc(pRef, { [`reactions.${user.uid}`]: deleteField() });
+        } else {
+          await updateDoc(pRef, { [`reactions.${user.uid}`]: emoji });
+        }
       }
-    } catch (err) {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      const current = snap.data().reactions?.[user.uid] || null;
-      if (current === emoji) await updateDoc(pRef, { [`reactions.${user.uid}`]: deleteField() });
-      else await updateDoc(pRef, { [`reactions.${user.uid}`]: emoji });
+    } catch (error) {
+      console.error('Reaction failed:', error);
+      try {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        const current = snap.data().reactions?.[user.uid] || null;
+        if (current === emoji) {
+          await updateDoc(pRef, { [`reactions.${user.uid}`]: deleteField() });
+        } else {
+          await updateDoc(pRef, { [`reactions.${user.uid}`]: emoji });
+        }
+      } catch (fallbackError) {
+        alert('Failed to add reaction');
+      }
     }
-  };
+  }, [user]);
 
-  const handleVote = async (post, voteType) => {
-    if (!user) return alert('Please sign in');
+  const handleVote = useCallback(async (post, voteType) => {
+    if (!user) {
+      alert('Please sign in');
+      return;
+    }
+
     try {
       const res = await fetch('/api/forum/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: post.id, userId: user.uid, voteType }),
       });
-      if (!res.ok) {
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.fallback) {
+          const pRef = doc(db, 'post', post.id);
+          const snap = await getDoc(pRef);
+          if (!snap.exists()) {
+            alert('Post not found');
+            return;
+          }
+          
+          const postData = snap.data();
+          const votes = { ...(postData.votes || {}) };
+          const current = votes[user.uid];
+          let delta = 0;
+          
+          if (current === voteType) {
+            delete votes[user.uid];
+            delta = voteType === 'upvote' ? -1 : 1;
+          } else if (current) {
+            votes[user.uid] = voteType;
+            delta = voteType === 'upvote' ? 2 : -2;
+          } else {
+            votes[user.uid] = voteType;
+            delta = voteType === 'upvote' ? 1 : -1;
+          }
+          
+          await updateDoc(pRef, { votes, score: (postData.score || 0) + delta });
+        }
+      } else {
         const pRef = doc(db, 'post', post.id);
         const snap = await getDoc(pRef);
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        
+        const postData = snap.data();
+        const votes = { ...(postData.votes || {}) };
+        const current = votes[user.uid];
+        let delta = 0;
+        
+        if (current === voteType) {
+          delete votes[user.uid];
+          delta = voteType === 'upvote' ? -1 : 1;
+        } else if (current) {
+          votes[user.uid] = voteType;
+          delta = voteType === 'upvote' ? 2 : -2;
+        } else {
+          votes[user.uid] = voteType;
+          delta = voteType === 'upvote' ? 1 : -1;
+        }
+        
+        await updateDoc(pRef, { votes, score: (postData.score || 0) + delta });
+      }
+    } catch (error) {
+      console.error('Vote failed:', error);
+      try {
+        const pRef = doc(db, 'post', post.id);
+        const snap = await getDoc(pRef);
+        if (!snap.exists()) {
+          alert('Post not found');
+          return;
+        }
+        
         const data = snap.data();
         const votes = { ...(data.votes || {}) };
         const current = votes[user.uid];
         let delta = 0;
-        if (current === voteType) { delete votes[user.uid]; delta = voteType === 'upvote' ? -1 : 1; }
-        else if (current) { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 2 : -2; }
-        else { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 1 : -1; }
+        
+        if (current === voteType) {
+          delete votes[user.uid];
+          delta = voteType === 'upvote' ? -1 : 1;
+        } else if (current) {
+          votes[user.uid] = voteType;
+          delta = voteType === 'upvote' ? 2 : -2;
+        } else {
+          votes[user.uid] = voteType;
+          delta = voteType === 'upvote' ? 1 : -1;
+        }
+        
         await updateDoc(pRef, { votes, score: (data.score || 0) + delta });
+      } catch (fallbackError) {
+        alert('Failed to vote');
       }
-    } catch (err) {
-      const pRef = doc(db, 'post', post.id);
-      const snap = await getDoc(pRef);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const votes = { ...(data.votes || {}) };
-      const current = votes[user.uid];
-      let delta = 0;
-      if (current === voteType) { delete votes[user.uid]; delta = voteType === 'upvote' ? -1 : 1; }
-      else if (current) { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 2 : -2; }
-      else { votes[user.uid] = voteType; delta = voteType === 'upvote' ? 1 : -1; }
-      await updateDoc(pRef, { votes, score: (data.score || 0) + delta });
     }
-  };
+  }, [user]);
 
   const emptyState = !isFetching && sortedPosts.length === 0;
 
@@ -451,15 +644,25 @@ export default function ForumPage() {
       </div>
 
       {isComposerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm">
           <div className="w-full max-w-4xl">
-            <Card className="p-6 shadow-2xl bg-white dark:bg-slate-900">
+            <Card className="p-6 shadow-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-xs uppercase text-slate-500 tracking-[0.12em]">Create post</p>
-                  <h3 className="text-xl font-semibold">Share your question or insight</h3>
+                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Share your question or insight</h3>
                 </div>
                 <Button variant="ghost" onClick={() => setComposerOpen(false)}>Close</Button>
+              </div>
+              
+              {/* Inline guidance */}
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">How to ask a good question:</p>
+                <ul className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 space-y-0.5">
+                  <li>• Include: code snippet, error message, what you tried</li>
+                  <li>• Be specific about your problem and expected outcome</li>
+                  <li>• Add relevant tags to help others find your question</li>
+                </ul>
               </div>
               <div className="grid gap-4 md:grid-cols-[2fr_1.2fr]">
                 <div className="space-y-3">
@@ -496,14 +699,14 @@ export default function ForumPage() {
                   </div>
                   {!showPreview ? (
                     <Textarea
-                      rows={8}
-                      placeholder="Describe the problem, share code blocks, and what you tried..."
+                      rows={10}
+                      placeholder="Describe your problem in detail:\n\n• What are you trying to achieve?\n• What have you tried so far?\n• What error are you getting?\n• Include relevant code snippets\n\nUse ``` for code blocks and be specific!"
                       value={newPost.content}
                       onChange={(e) => setNewPost((p) => ({ ...p, content: e.target.value }))}
-                      className="font-mono"
+                      className="font-mono text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   ) : (
-                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 prose prose-slate max-w-none">
+                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-900 prose prose-slate dark:prose-invert max-w-none min-h-[240px]">
                       <ReactMarkdown>{newPost.content || '_Nothing to preview yet_'}</ReactMarkdown>
                     </div>
                   )}
@@ -569,102 +772,151 @@ export default function ForumPage() {
   );
 }
 
-function PostCard({ post, user, isModerator, onVote, onReact, onPin, onLock, onDelete }) {
+const MetaRow = memo(function MetaRow({ post }) {
+  const role = roleFlair(post.role);
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+      <div className="flex items-center gap-2 min-w-0">
+        <Avatar name={post.authorName} className="w-5 h-5 flex-shrink-0" />
+        <span className="truncate font-medium text-slate-700 dark:text-slate-200">{post.authorName || 'Anonymous'}</span>
+        <Badge variant={role.variant} className="text-[10px]">{role.emoji} {role.label}</Badge>
+        {post.context && <Badge variant="outline" className="text-[10px]">{post.context}</Badge>}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span>{timeAgo(post.createdAt)}</span>
+        <ResolutionBadgeSmall status={post.resolutionStatus} />
+      </div>
+    </div>
+  );
+});
+
+const StatusBadges = memo(function StatusBadges({ post, instructorReplied }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {post.isPinned && <Badge variant="secondary" className="text-[10px] gap-1"><Pin className="w-3 h-3" /> Pinned</Badge>}
+      {post.isLocked && <Badge variant="warning" className="text-[10px] gap-1"><Lock className="w-3 h-3" /> Locked</Badge>}
+      {instructorReplied && <Badge variant="success" className="text-[10px] gap-1"><ShieldCheck className="w-3 h-3" /> Instructor replied</Badge>}
+    </div>
+  );
+});
+
+const ActionRow = memo(function ActionRow({ post, replyCount, reactionCount, isModerator, user, onReact, onPin, onLock, onDelete }) {
+  return (
+    <div className="flex items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-700 text-[11px] md:text-xs text-slate-600">
+      <Link href={`/forum/${post.id}`} className="inline-flex items-center gap-1 hover:text-indigo-600">
+        <MessageSquare className="w-3 h-3" /> {replyCount} comment{replyCount !== 1 ? 's' : ''}
+      </Link>
+      <div className="flex items-center gap-1">
+        {['👍', '❤️', '🎉', '🤔', '👀'].map((emoji) => {
+          const count = reactionCount(emoji);
+          return (
+            <button key={emoji} onClick={() => onReact(post, emoji)} className="px-1.5 py-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-[10px]">
+              {emoji} {count > 0 && count}
+            </button>
+          );
+        })}
+      </div>
+      <Link href={`/forum/${post.id}`} className="hover:text-indigo-600">Open</Link>
+      <div className="ml-auto flex items-center gap-1">
+        {isModerator && (
+          <>
+            <button onClick={() => onPin(post)} className="hover:text-indigo-600 text-[11px] px-1 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+              {post.isPinned ? 'Unpin' : 'Pin'}
+            </button>
+            <button onClick={() => onLock(post)} className="hover:text-indigo-600 text-[11px] px-1 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+              {post.isLocked ? 'Unlock' : 'Lock'}
+            </button>
+          </>
+        )}
+        {(isModerator || post.authorId === user?.uid) && (
+          <button onClick={() => onDelete(post)} className="text-red-600 hover:text-red-700 text-[11px] px-1 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20">
+            Delete
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
+const PostCard = memo(function PostCard({ post, user, isModerator, onVote, onReact, onPin, onLock, onDelete }) {
   const replyCount = Array.isArray(post.replies) ? post.replies.length : 0;
   const tags = Array.isArray(post.tags) ? post.tags : [];
   const reactions = post.reactions || {};
-  const reactionCount = (emoji) => Object.values(reactions).filter((e) => e === emoji).length;
+  const reactionCount = useCallback((emoji) => Object.values(reactions).filter((e) => e === emoji).length, [reactions]);
   const instructorReplied = post.isAnswered;
-  return (
-    <Card className="p-0 overflow-hidden border border-slate-200 bg-white/80 dark:bg-slate-800/80">
-      <div className="grid grid-cols-[64px_1fr]">
-        <div className="flex flex-col items-center gap-2 border-r border-slate-100 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 py-4">
-          <IconPill icon={<ArrowBigUp className="w-5 h-5" />} label="Upvote" onClick={() => onVote(post, 'upvote')} />
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Vote</div>
-          <IconPill icon={<ArrowBigDown className="w-5 h-5" />} label="Downvote" onClick={() => onVote(post, 'downvote')} />
-        </div>
-        <div className="p-5 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
-                {post.isPinned && (
-                  <Badge variant="secondary" className="gap-1">
-                    <Pin className="w-3 h-3" /> Pinned
-                  </Badge>
-                )}
-                {post.isLocked && (
-                  <Badge variant="warning" className="gap-1">
-                    <Lock className="w-3 h-3" /> Locked
-                  </Badge>
-                )}
-                <ResolutionBadgeSmall status={post.resolutionStatus} />
-                {instructorReplied && (
-                  <Badge variant="success" className="gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Instructor replied
-                  </Badge>
-                )}
-              </div>
-              <Link href={`/forum/${post.id}`} className="text-xl font-semibold text-slate-900 dark:text-white hover:text-indigo-600">
-                {post.title}
-              </Link>
-              <p className="text-slate-700 dark:text-slate-200 line-clamp-3">{post.content}</p>
-              {Array.isArray(post.images) && post.images.length > 0 && (
-                <ImageGallery images={post.images} />
-              )}
-              {tags.length > 0 && (
-                <div className="flex gap-2 flex-wrap">
-                  {tags.map((t) => (
-                    <Badge key={t} variant="outline" className="rounded-full">#{t}</Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col items-end text-sm text-slate-500">
-              <span className="flex items-center gap-2">
-                <Avatar name={post.authorName} className="w-8 h-8" />
-                <div className="text-right">
-                  <div className="text-slate-900 dark:text-white font-medium">{post.authorName || 'Anonymous'}</div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {(() => { const f = roleFlair(post.role); return (<Badge variant={f.variant}>{f.emoji} {f.label}</Badge>); })()}
-                    <span>{timeAgo(post.createdAt)}</span>
-                  </div>
-                </div>
-              </span>
-            </div>
-          </div>
+  
+  // Check if post contains code
+  const hasCode = post.content && post.content.includes('```');
+  const codeMatch = hasCode ? post.content.match(/```(\w*)\n?([\s\S]*?)\n?```/) : null;
+  const codeLang = codeMatch ? codeMatch[1] || 'code' : 'code';
+  const codeSnippet = codeMatch ? codeMatch[2].split('\n')[0].slice(0, 50) + '...' : '';
+  
+  // Get plain text preview (remove markdown)
+  const plainTextPreview = post.content
+    ?.replace(/```[\s\S]*?```/g, '')
+    ?.replace(/`[^`]*`/g, '')
+    ?.replace(/!\[.*?\]\(.*?\)/g, '')
+    ?.replace(/\[.*?\]\(.*?\)/g, '')
+    ?.replace(/[#*~_>]/g, '')
+    ?.trim() || '';
 
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-700 text-sm">
-            <Link href={`/forum/${post.id}`} className="flex items-center gap-1 text-slate-600 hover:text-indigo-600">
-              <MessageSquare className="w-4 h-4" /> {replyCount} comment{replyCount !== 1 ? 's' : ''}
-            </Link>
-            <div className="flex items-center gap-1 text-slate-600">
-              {['👍', '❤️', '🎉', '🤔', '👀'].map((emoji) => (
-                <button key={emoji} onClick={() => onReact(post, emoji)} className="px-2 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
-                  {emoji} {reactionCount(emoji)}
-                </button>
+  return (
+    <Card className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-150 group">
+      <div className="grid grid-cols-[56px,minmax(0,1fr)]">
+        <aside className="flex flex-col items-center justify-center gap-1 border-r border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 py-3">
+          <button 
+            onClick={() => onVote(post, 'upvote')} 
+            className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            aria-label="Upvote"
+          >
+            <ArrowBigUp className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+          </button>
+          <div className="h-1 w-1 rounded-full bg-slate-400/70" />
+          <button 
+            onClick={() => onVote(post, 'downvote')} 
+            className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            aria-label="Downvote"
+          >
+            <ArrowBigDown className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+          </button>
+        </aside>
+
+        <main className="p-4 space-y-2">
+          <MetaRow post={post} />
+
+          <Link href={`/forum/${post.id}`} className="block text-sm md:text-base font-semibold text-slate-900 dark:text-white hover:text-indigo-600 line-clamp-2">
+            {post.title}
+          </Link>
+
+          <p className="text-xs md:text-sm text-slate-700 dark:text-slate-200 line-clamp-2">
+            {plainTextPreview}
+          </p>
+
+          {hasCode && (
+            <div className="inline-flex items-center rounded bg-slate-900 text-slate-100 text-[11px] px-2 py-1 font-mono">
+              <span className="opacity-70 mr-1">{codeLang}</span>
+              <span className="line-clamp-1">{codeSnippet}</span>
+            </div>
+          )}
+
+          <StatusBadges post={post} instructorReplied={instructorReplied} />
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {tags.map((t) => (
+                <span key={t} className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300">
+                  #{t}
+                </span>
               ))}
             </div>
-            <div className="ml-auto flex items-center gap-2">
-              {isModerator && (
-                <>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => onPin(post)}>
-                    <Pin className="w-4 h-4" /> {post.isPinned ? 'Unpin' : 'Pin'}
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => onLock(post)}>
-                    {post.isLocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />} {post.isLocked ? 'Unlock' : 'Lock'}
-                  </Button>
-                </>
-              )}
-              {(isModerator || post.authorId === user?.uid) && (
-                <Button size="sm" variant="destructive" onClick={() => onDelete(post)}>Delete</Button>
-              )}
-            </div>
-          </div>
-        </div>
+          )}
+
+          <ActionRow post={post} replyCount={replyCount} reactionCount={reactionCount} isModerator={isModerator} user={user} onReact={onReact} onPin={onPin} onLock={onLock} onDelete={onDelete} />
+        </main>
       </div>
     </Card>
   );
-}
+});
 
 function IconPill({ icon, onClick, label }) {
   return (
@@ -692,23 +944,89 @@ function ResolutionBadgeSmall({ status }) {
 
 function SkeletonPostCard() {
   return (
-    <Card className="p-5 border border-slate-200 bg-white/60 animate-pulse">
-      <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
-      <div className="h-5 w-3/4 bg-slate-200 rounded mb-3" />
-      <div className="h-3 w-full bg-slate-200 rounded mb-1" />
-      <div className="h-3 w-5/6 bg-slate-200 rounded" />
+    <Card className="rounded-xl border border-slate-200 bg-white/60 animate-pulse">
+      <div className="grid grid-cols-[56px,minmax(0,1fr)]">
+        {/* Vote Rail Skeleton */}
+        <aside className="flex flex-col items-center justify-center gap-1 border-r border-slate-100 bg-slate-50/80 py-3">
+          <div className="w-4 h-4 bg-slate-200 rounded-full" />
+          <div className="h-1 w-1 rounded-full bg-slate-300" />
+          <div className="w-4 h-4 bg-slate-200 rounded-full" />
+        </aside>
+        
+        {/* Content Skeleton */}
+        <main className="p-4 space-y-2">
+          {/* Meta Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-slate-200 rounded-full" />
+              <div className="h-3 w-16 bg-slate-200 rounded" />
+              <div className="h-3 w-12 bg-slate-200 rounded" />
+            </div>
+            <div className="h-3 w-20 bg-slate-200 rounded" />
+          </div>
+          
+          {/* Title */}
+          <div className="h-4 w-3/4 bg-slate-200 rounded" />
+          
+          {/* Content Preview */}
+          <div className="space-y-1">
+            <div className="h-3 w-full bg-slate-200 rounded" />
+            <div className="h-3 w-5/6 bg-slate-200 rounded" />
+          </div>
+          
+          {/* Tags */}
+          <div className="flex gap-1">
+            <div className="h-4 w-12 bg-slate-200 rounded-full" />
+            <div className="h-4 w-16 bg-slate-200 rounded-full" />
+          </div>
+          
+          {/* Action Row */}
+          <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+            <div className="h-3 w-16 bg-slate-200 rounded" />
+            <div className="h-3 w-12 bg-slate-200 rounded" />
+            <div className="h-3 w-8 bg-slate-200 rounded" />
+          </div>
+        </main>
+      </div>
     </Card>
   );
 }
 
 function EmptyState() {
   return (
-    <Card className="p-10 text-center border-dashed border-2 border-slate-200 bg-white/60">
-      <div className="mx-auto w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 mb-3">
-        <MessageSquare className="w-6 h-6" />
+    <Card className="rounded-xl border-2 border-dashed border-slate-200 bg-white/60 p-8">
+      <div className="text-center space-y-4">
+        <div className="mx-auto w-16 h-16 rounded-full bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-500">
+          <MessageSquare className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No posts yet</h3>
+          <p className="text-slate-600 dark:text-slate-400">Be the first to ask a question or share a solution.</p>
+        </div>
+        
+        {/* How to ask a good question tips */}
+        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 text-left max-w-md mx-auto">
+          <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-2">How to ask a good question:</h4>
+          <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+            <li className="flex items-start gap-2">
+              <span className="text-indigo-500 mt-0.5">•</span>
+              <span>Include a clear, specific title</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-indigo-500 mt-0.5">•</span>
+              <span>Describe what you've tried</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-indigo-500 mt-0.5">•</span>
+              <span>Add relevant code snippets</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-indigo-500 mt-0.5">•</span>
+              <span>Include error messages if any</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <h3 className="text-lg font-semibold text-slate-900">No posts yet</h3>
-      <p className="text-slate-600">Be the first to ask a question or share a solution.</p>
     </Card>
   );
 }

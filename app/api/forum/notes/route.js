@@ -5,6 +5,11 @@ const MOD_ROLES = ['admin', 'teacher', 'instructor']
 
 export async function GET(request) {
   try {
+    if (!adminDb) {
+      // Return empty notes instead of 503 - frontend will use client-side fallback
+      return NextResponse.json({ notes: '', updatedAt: null, updatedBy: null, fallback: true })
+    }
+
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
     const userRole = searchParams.get('userRole') || ''
@@ -29,6 +34,11 @@ export async function GET(request) {
 
 export async function PATCH(request) {
   try {
+    if (!adminDb) {
+      // Return success with fallback flag - frontend will use client-side Firestore
+      return NextResponse.json({ success: true, fallback: true, message: 'Using client-side Firestore' })
+    }
+
     const { postId, userId, userRole, notes } = await request.json()
     if (!postId || !userId || typeof notes !== 'string') {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -53,5 +63,3 @@ export async function PATCH(request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
-
-
