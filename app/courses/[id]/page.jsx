@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -35,13 +35,14 @@ export default function CourseDetailPage() {
 				if (userDoc.exists()) {
 					setRole(userDoc.data().role);
 					if (userDoc.data().role === 'student') {
-						// Check enrollment
+						// Check enrollment directly from Firestore (client-side)
 						try {
-							const response = await fetch(`/api/courses/${courseId}/enroll?studentId=${user.uid}`);
-							const data = await response.json();
-							setIsEnrolled(data.enrolled || false);
+							const enrollmentRef = doc(db, 'enrollment', `${user.uid}_${courseId}`);
+							const enrollmentDoc = await getDoc(enrollmentRef);
+							setIsEnrolled(enrollmentDoc.exists());
 						} catch (err) {
 							console.error('Error checking enrollment:', err);
+							setIsEnrolled(false);
 						}
 					}
 				}
@@ -160,21 +161,47 @@ export default function CourseDetailPage() {
 		}
 
 		setLoading(true);
+		setError('');
 		try {
-			const response = await fetch(`/api/courses/${courseId}/enroll`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ studentId: userId }),
+			// Enroll directly from client-side to use Firebase Auth context
+			// Verify course exists and is published
+			const courseRef = doc(db, 'course', courseId);
+			const courseDoc = await getDoc(courseRef);
+			
+			if (!courseDoc.exists()) {
+				throw new Error('Course not found');
+			}
+			
+			const courseData = courseDoc.data();
+			if (courseData.status !== 'published') {
+				throw new Error('Cannot enroll in unpublished course');
+			}
+			
+			// Check if already enrolled
+			const enrollmentRef = doc(db, 'enrollment', `${userId}_${courseId}`);
+			const enrollmentDoc = await getDoc(enrollmentRef);
+			
+			if (enrollmentDoc.exists()) {
+				throw new Error('Already enrolled in this course');
+			}
+			
+			// Create enrollment (client-side with auth context)
+			await setDoc(enrollmentRef, {
+				studentId: userId,
+				courseId: courseId,
+				enrolledAt: serverTimestamp(),
+				progress: {
+					completedModules: [],
+					completedLessons: [],
+					overallProgress: 0,
+				},
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || 'Failed to enroll');
-			}
-
 			setIsEnrolled(true);
+			// Reload course data to reflect enrollment
+			window.location.reload();
 		} catch (err) {
+			console.error('Enrollment error details:', err);
 			setError(err.message || 'Failed to enroll');
 		} finally {
 			setLoading(false);
