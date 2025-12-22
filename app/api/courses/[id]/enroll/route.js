@@ -18,10 +18,17 @@ async function isEnrolled(studentId, courseId) {
 export async function POST(request, { params }) {
 	try {
 		const { id: courseId } = await params;
-		const { studentId } = await request.json();
+		const body = await request.json();
+		const { studentId } = body;
+
+		console.log('Enrollment request:', { courseId, studentId });
 
 		if (!studentId) {
 			return NextResponse.json({ error: 'Student ID required' }, { status: 400 });
+		}
+
+		if (!courseId) {
+			return NextResponse.json({ error: 'Course ID required' }, { status: 400 });
 		}
 
 		// Verify course exists
@@ -29,6 +36,7 @@ export async function POST(request, { params }) {
 		const courseDoc = await getDoc(courseRef);
 
 		if (!courseDoc.exists()) {
+			console.error('Course not found:', courseId);
 			return NextResponse.json({ error: 'Course not found' }, { status: 404 });
 		}
 
@@ -44,7 +52,11 @@ export async function POST(request, { params }) {
 		}
 
 		// Create enrollment
-		const enrollmentRef = doc(db, 'enrollment', `${studentId}_${courseId}`);
+		const enrollmentId = `${studentId}_${courseId}`;
+		const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+		
+		console.log('Creating enrollment:', enrollmentId);
+		
 		await setDoc(enrollmentRef, {
 			studentId,
 			courseId,
@@ -56,10 +68,16 @@ export async function POST(request, { params }) {
 			},
 		});
 
+		console.log('Enrollment created successfully');
 		return NextResponse.json({ success: true, message: 'Enrolled successfully' });
 	} catch (err) {
 		console.error('Enrollment error:', err);
-		return NextResponse.json({ error: 'Failed to enroll', details: String(err) }, { status: 500 });
+		console.error('Error stack:', err.stack);
+		return NextResponse.json({ 
+			error: 'Failed to enroll', 
+			details: err.message || String(err),
+			stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+		}, { status: 500 });
 	}
 }
 

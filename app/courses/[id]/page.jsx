@@ -160,22 +160,48 @@ export default function CourseDetailPage() {
 		}
 
 		setLoading(true);
+		setError('');
 		try {
-			const response = await fetch(`/api/courses/${courseId}/enroll`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ studentId: userId }),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || 'Failed to enroll');
+			// Use client-side Firestore to create enrollment (has auth context)
+			const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+			
+			// Check if already enrolled
+			const enrollmentId = `${userId}_${courseId}`;
+			const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+			const enrollmentDoc = await getDoc(enrollmentRef);
+			
+			if (enrollmentDoc.exists()) {
+				setError('You are already enrolled in this course');
+				setIsEnrolled(true);
+				setLoading(false);
+				return;
 			}
 
+			// Verify course is published
+			if (course.status !== 'published') {
+				setError('Cannot enroll in unpublished course');
+				setLoading(false);
+				return;
+			}
+
+			// Create enrollment (client-side has auth context)
+			await setDoc(enrollmentRef, {
+				studentId: userId,
+				courseId: courseId,
+				enrolledAt: serverTimestamp(),
+				progress: {
+					completedModules: [],
+					completedLessons: [],
+					overallProgress: 0,
+				},
+			});
+
 			setIsEnrolled(true);
+			// Reload the page to show enrolled status
+			window.location.reload();
 		} catch (err) {
-			setError(err.message || 'Failed to enroll');
+			console.error('Enrollment error:', err);
+			setError(err.message || 'Failed to enroll. Please try again.');
 		} finally {
 			setLoading(false);
 		}
@@ -189,11 +215,11 @@ export default function CourseDetailPage() {
 		);
 	}
 
-	if (error || !course) {
+	if (!course) {
 		return (
 			<Card className="border-error bg-error/5">
 				<CardContent className="pt-6">
-					<p className="text-body text-error">{error || 'Course not found'}</p>
+					<p className="text-body text-error">Course not found</p>
 				</CardContent>
 			</Card>
 		);
@@ -240,6 +266,11 @@ export default function CourseDetailPage() {
 						</span>
 					)}
 				</div>
+				{error && (
+					<div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+						<p className="text-sm text-destructive">{error}</p>
+					</div>
+				)}
 			</div>
 
 			{/* Modules & Lessons Structure */}
