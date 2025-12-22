@@ -21,6 +21,7 @@ export default function ModuleDetailPage() {
 	const moduleId = params.id;
 	
 	const [module, setModule] = useState(null);
+	const [course, setCourse] = useState(null);
 	const [lessons, setLessons] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
@@ -75,6 +76,18 @@ export default function ModuleDetailPage() {
 			const moduleData = { id: moduleDoc.id, ...moduleDoc.data() };
 			setModule(moduleData);
 			setNewTitle(moduleData.title);
+
+			// Load course information if courseId exists
+			if (moduleData.courseId) {
+				try {
+					const courseDoc = await getDoc(doc(db, 'course', moduleData.courseId));
+					if (courseDoc.exists()) {
+						setCourse({ id: courseDoc.id, ...courseDoc.data() });
+					}
+				} catch (courseErr) {
+					console.error('Error loading course:', courseErr);
+				}
+			}
 
 			// Load lessons
 			if (moduleData.lessons && moduleData.lessons.length > 0) {
@@ -506,18 +519,39 @@ export default function ModuleDetailPage() {
 	return (
 		<div className="max-w-4xl mx-auto space-y-6">
 			{/* Header */}
-			<div className="flex items-center gap-3">
-				<Link href="/dashboard/modules">
-					<Button 
-						variant="ghost" 
-						size="sm" 
-						className="hover:bg-neutralLight transition-colors duration-200"
-						title="Return to the module library"
-					>
-						<ArrowLeft className="h-5 w-5 mr-2" />
-						Back to Module Library
-					</Button>
-				</Link>
+			<div className="flex items-center justify-between">
+				<div className="flex items-center gap-3">
+					{course ? (
+						<Link href={`/dashboard/courses/${course.id}/edit`}>
+							<Button 
+								variant="ghost" 
+								size="sm" 
+								className="hover:bg-neutralLight transition-colors duration-200"
+								title="Return to course editor"
+							>
+								<ArrowLeft className="h-5 w-5 mr-2" />
+								Back to Course
+							</Button>
+						</Link>
+					) : (
+						<Link href="/dashboard/courses">
+							<Button 
+								variant="ghost" 
+								size="sm" 
+								className="hover:bg-neutralLight transition-colors duration-200"
+								title="Return to courses"
+							>
+								<ArrowLeft className="h-5 w-5 mr-2" />
+								Back to Courses
+							</Button>
+						</Link>
+					)}
+				</div>
+				{course && (
+					<div className="text-caption text-muted-foreground">
+						Course: <span className="font-medium text-neutralDark">{course.title}</span>
+					</div>
+				)}
 			</div>
 
 			{/* Module Title */}

@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ClipboardCheck, FileText, Code, Clock, Calendar, Upload, ArrowRight, Edit2, Trash2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Plus, File, X, Loader2 } from 'lucide-react';
+import { ClipboardCheck, FileText, Code, Clock, Calendar, Upload, ArrowRight, Edit2, Trash2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Plus, Users, File, X, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/contexts/LanguageContext';
 
@@ -83,63 +83,107 @@ export default function AssessmentsPage() {
 		setLoading(true);
 		try {
 			let assessmentsQuery;
+			let enrolledCourseIds = [];
 			
 			if (userRole === 'student') {
-				// First, get all published assessments
-				// Note: We query without orderBy first to avoid index issues, then sort client-side
-				assessmentsQuery = query(
-					collection(db, 'assessment'),
-					where('published', '==', true)
-				);
-				
-				const snapshot = await getDocs(assessmentsQuery);
-				const allAssessments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				})).sort((a, b) => {
-					// Sort by createdAt if available, otherwise by id
-					const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-					const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-					return bTime - aTime;
-				});
+				// First, get all courses the student is enrolled in
+				if (!currentUserId) {
+					console.log('loadAssessments: currentUserId not available yet');
+					setLoading(false);
+					return;
+				}
 
-				// Then, filter by enrollment - only show assessments for courses the student is enrolled in
-				if (currentUserId) {
+				try {
 					const enrollmentsQuery = query(
 						collection(db, 'enrollment'),
 						where('studentId', '==', currentUserId)
 					);
 					const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-					const enrolledCourseIds = new Set(
-						enrollmentsSnapshot.docs.map(doc => doc.data().courseId)
-					);
-
-					// Filter assessments to only those for enrolled courses
-					const filteredAssessments = allAssessments.filter(assessment => 
-						assessment.courseId && enrolledCourseIds.has(assessment.courseId)
-					);
-
-					setAssessments(filteredAssessments);
-				} else {
-					setAssessments([]);
+					enrolledCourseIds = enrollmentsSnapshot.docs.map(doc => {
+						const data = doc.data();
+						return data.courseId;
+					}).filter(Boolean); // Remove any undefined/null values
+					
+					console.log('loadAssessments: Enrolled course IDs:', enrolledCourseIds);
+				} catch (enrollmentErr) {
+					console.error('Error loading enrollments:', enrollmentErr);
+					// Continue even if enrollment query fails, but show no assessments
+					enrolledCourseIds = [];
 				}
+
+				// Students see only published assessments for courses they're enrolled in
+				assessmentsQuery = query(
+					collection(db, 'assessment'),
+					where('published', '==', true),
+					orderBy('createdAt', 'desc')
+				);
 			} else {
 				// Teachers and admins see all assessments
 				assessmentsQuery = query(
 					collection(db, 'assessment'),
 					orderBy('createdAt', 'desc')
 				);
-
-				const snapshot = await getDocs(assessmentsQuery);
-				const loadedAssessments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				}));
-
-				setAssessments(loadedAssessments);
 			}
+
+			let snapshot;
+			try {
+				snapshot = await getDocs(assessmentsQuery);
+			} catch (queryErr) {
+				// If orderBy query fails (missing index), try without orderBy
+				if (queryErr.code === 'failed-precondition' || queryErr.message?.includes('index')) {
+					console.warn('OrderBy query failed (missing index), trying without orderBy:', queryErr);
+					const fallbackQuery = query(
+						collection(db, 'assessment'),
+						where('published', '==', true)
+					);
+					snapshot = await getDocs(fallbackQuery);
+				} else {
+					throw queryErr;
+				}
+			}
+
+			let loadedAssessments = snapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+
+			// Sort manually if we couldn't use orderBy
+			if (userRole !== 'student' || enrolledCourseIds.length > 0) {
+				loadedAssessments.sort((a, b) => {
+					const aTime = a.createdAt?.toDate?.() || a.createdAt || 0;
+					const bTime = b.createdAt?.toDate?.() || b.createdAt || 0;
+					return bTime - aTime;
+				});
+			}
+
+			console.log('loadAssessments: All published assessments:', loadedAssessments.map(a => ({
+				id: a.id,
+				title: a.title,
+				courseId: a.courseId
+			})));
+
+			// Filter assessments by enrollment for students
+			if (userRole === 'student') {
+				if (enrolledCourseIds.length > 0) {
+					loadedAssessments = loadedAssessments.filter(assessment => {
+						const matches = enrolledCourseIds.includes(assessment.courseId);
+						if (!matches && assessment.courseId) {
+							console.log(`Assessment "${assessment.title}" (courseId: ${assessment.courseId}) not in enrolled courses`);
+						}
+						return matches;
+					});
+					console.log('loadAssessments: Filtered assessments:', loadedAssessments.length);
+				} else {
+					// Student has no enrollments, show no assessments
+					console.log('loadAssessments: Student has no enrollments');
+					loadedAssessments = [];
+				}
+			}
+
+			setAssessments(loadedAssessments);
 		} catch (err) {
 			console.error('Error loading assessments:', err);
+			setAssessments([]);
 		} finally {
 			setLoading(false);
 		}
@@ -688,6 +732,12 @@ export default function AssessmentsPage() {
 											)
 										) : (
 											<>
+												<Link href={`/assessments/${assessment.id}/submissions`} className="flex-1 min-w-[100px]">
+													<Button variant="outline" className="w-full border-secondary/20 hover:bg-secondary/10 hover:border-secondary/40" size="sm" title="View Submissions">
+														<Users className="h-5 w-5 mr-2 text-secondary" />
+														Submissions
+													</Button>
+												</Link>
 												<Link href={`/assessments/${assessment.id}/edit`} className="flex-1 min-w-[100px]">
 													<Button variant="outline" className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/40" size="sm" title={language === 'bm' ? 'Edit Penilaian' : 'Edit Assessment'}>
 														<Edit2 className="h-5 w-5 mr-2 text-primary" />

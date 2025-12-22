@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BookOpen, ClipboardCheck, TrendingUp, Brain, ArrowRight } from 'lucide-react';
 import { Metric, Flex, Text, ProgressBar } from '@tremor/react';
+import LearningRecommendations from '@/app/components/LearningRecommendations';
 
 export default function StudentDashboard() {
 	return (
@@ -156,6 +157,20 @@ export default function StudentDashboard() {
 						</CardContent>
 					</Card>
 				</div>
+			</div>
+
+			{/* Learning Recommendations */}
+			<div className="space-y-4">
+				<div className="flex items-center justify-between">
+					<h2 className="text-h2 text-neutralDark">Learning Recommendations</h2>
+					<Link href="/recommendations">
+						<Button variant="outline" className="flex items-center gap-2">
+							<Brain className="h-4 w-4" />
+							View All Recommendations
+						</Button>
+					</Link>
+				</div>
+				<LearningRecommendations />
 			</div>
 		</div>
 	);

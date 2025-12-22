@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { BookOpen, CheckCircle2, Clock, Award, FileText, ClipboardCheck, TrendingUp, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function ProgressPage() {
+	const { language } = useLanguage();
 	const [loading, setLoading] = useState(true);
 	const [currentUserId, setCurrentUserId] = useState(null);
 	const [userRole, setUserRole] = useState(null);
@@ -237,9 +239,9 @@ export default function ProgressPage() {
 	}
 
 	function formatDate(timestamp) {
-		if (!timestamp) return 'N/A';
+		if (!timestamp) return language === 'bm' ? 'Tiada' : 'N/A';
 		const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-		return date.toLocaleDateString('en-US', { 
+		return date.toLocaleDateString(language === 'bm' ? 'ms-MY' : 'en-US', { 
 			year: 'numeric', 
 			month: 'short', 
 			day: 'numeric'
@@ -247,9 +249,9 @@ export default function ProgressPage() {
 	}
 
 	function formatDateTime(timestamp) {
-		if (!timestamp) return 'N/A';
+		if (!timestamp) return language === 'bm' ? 'Tiada' : 'N/A';
 		const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-		return date.toLocaleDateString('en-US', { 
+		return date.toLocaleDateString(language === 'bm' ? 'ms-MY' : 'en-US', { 
 			year: 'numeric', 
 			month: 'short', 
 			day: 'numeric',
@@ -262,8 +264,12 @@ export default function ProgressPage() {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">My Progress</h1>
-					<p className="text-body text-muted-foreground">Loading...</p>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Kemajuan Saya' : 'My Progress'}
+					</h1>
+					<p className="text-body text-muted-foreground">
+						{language === 'bm' ? 'Memuatkan...' : 'Loading...'}
+					</p>
 				</div>
 			</div>
 		);
@@ -273,8 +279,14 @@ export default function ProgressPage() {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">My Progress</h1>
-					<p className="text-body text-muted-foreground">This page is only available for students.</p>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Kemajuan Saya' : 'My Progress'}
+					</h1>
+					<p className="text-body text-muted-foreground">
+						{language === 'bm' 
+							? 'Halaman ini hanya tersedia untuk pelajar.' 
+							: 'This page is only available for students.'}
+					</p>
 				</div>
 			</div>
 		);
@@ -284,9 +296,13 @@ export default function ProgressPage() {
 		<div className="space-y-8">
 			{/* Header */}
 			<div>
-				<h1 className="text-h1 text-neutralDark mb-2">My Progress</h1>
+				<h1 className="text-h1 text-neutralDark mb-2">
+					{language === 'bm' ? 'Kemajuan Saya' : 'My Progress'}
+				</h1>
 				<p className="text-body text-muted-foreground">
-					Track your learning progress across all enrolled courses
+					{language === 'bm' 
+						? 'Ikuti kemajuan pembelajaran anda merentas semua kursus yang didaftarkan'
+						: 'Track your learning progress across all enrolled courses'}
 				</p>
 			</div>
 
@@ -297,7 +313,9 @@ export default function ProgressPage() {
 						<CardContent className="pt-6">
 							<div className="flex items-center justify-between">
 								<div>
-									<p className="text-sm text-muted-foreground">Enrolled Courses</p>
+									<p className="text-sm text-muted-foreground">
+										{language === 'bm' ? 'Kursus yang Didaftarkan' : 'Enrolled Courses'}
+									</p>
 									<p className="text-2xl font-bold text-neutralDark">{courseProgress.length}</p>
 								</div>
 								<BookOpen className="h-8 w-8 text-primary" />
@@ -308,7 +326,9 @@ export default function ProgressPage() {
 						<CardContent className="pt-6">
 							<div className="flex items-center justify-between">
 								<div>
-									<p className="text-sm text-muted-foreground">Completed Lessons</p>
+									<p className="text-sm text-muted-foreground">
+										{language === 'bm' ? 'Pelajaran Selesai' : 'Completed Lessons'}
+									</p>
 									<p className="text-2xl font-bold text-neutralDark">
 										{courseProgress.reduce((sum, course) => sum + course.completedLessons, 0)}
 									</p>
@@ -321,7 +341,9 @@ export default function ProgressPage() {
 						<CardContent className="pt-6">
 							<div className="flex items-center justify-between">
 								<div>
-									<p className="text-sm text-muted-foreground">Assessments Completed</p>
+									<p className="text-sm text-muted-foreground">
+										{language === 'bm' ? 'Penilaian Selesai' : 'Assessments Completed'}
+									</p>
 									<p className="text-2xl font-bold text-neutralDark">
 										{courseProgress.reduce((sum, course) => sum + course.assessments.length, 0)}
 									</p>
@@ -339,10 +361,12 @@ export default function ProgressPage() {
 					<CardContent className="py-12 text-center">
 						<BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 						<p className="text-body text-muted-foreground">
-							You haven't enrolled in any courses yet.
+							{language === 'bm' 
+								? 'Anda belum mendaftar dalam sebarang kursus lagi.'
+								: "You haven't enrolled in any courses yet."}
 						</p>
 						<Link href="/courses/explore" className="mt-4 inline-block">
-							<Button>Explore Courses</Button>
+							<Button>{language === 'bm' ? 'Terokai Kursus' : 'Explore Courses'}</Button>
 						</Link>
 					</CardContent>
 				</Card>
@@ -357,13 +381,13 @@ export default function ProgressPage() {
 										<div className="flex items-center gap-4 text-sm text-muted-foreground">
 											<div className="flex items-center gap-1.5">
 												<Calendar className="h-4 w-4" />
-												Enrolled: {formatDate(course.enrolledAt)}
+												{language === 'bm' ? 'Didaftarkan:' : 'Enrolled:'} {formatDate(course.enrolledAt)}
 											</div>
 										</div>
 									</div>
 									<Link href={`/courses/${course.courseId}`}>
 										<Button variant="outline" size="sm">
-											View Course
+											{language === 'bm' ? 'Lihat Kursus' : 'View Course'}
 										</Button>
 									</Link>
 								</div>
@@ -372,7 +396,9 @@ export default function ProgressPage() {
 								{/* Overall Progress */}
 								<div>
 									<div className="flex items-center justify-between mb-2">
-										<span className="text-sm font-medium text-neutralDark">Overall Progress</span>
+										<span className="text-sm font-medium text-neutralDark">
+											{language === 'bm' ? 'Kemajuan Keseluruhan' : 'Overall Progress'}
+										</span>
 										<span className="text-sm font-bold text-primary">{course.overallProgress}%</span>
 									</div>
 									<div className="w-full bg-neutralLight rounded-full h-3">
@@ -388,7 +414,9 @@ export default function ProgressPage() {
 									<div className="p-4 bg-neutralLight rounded-lg">
 										<div className="flex items-center gap-2 mb-1">
 											<BookOpen className="h-5 w-5 text-primary" />
-											<span className="text-sm font-medium">Lessons</span>
+											<span className="text-sm font-medium">
+												{language === 'bm' ? 'Pelajaran' : 'Lessons'}
+											</span>
 										</div>
 										<p className="text-2xl font-bold text-neutralDark">
 											{course.completedLessons} / {course.totalLessons}
@@ -396,13 +424,15 @@ export default function ProgressPage() {
 										<p className="text-xs text-muted-foreground mt-1">
 											{course.totalLessons > 0 
 												? Math.round((course.completedLessons / course.totalLessons) * 100) 
-												: 0}% completed
+												: 0}% {language === 'bm' ? 'selesai' : 'completed'}
 										</p>
 									</div>
 									<div className="p-4 bg-neutralLight rounded-lg">
 										<div className="flex items-center gap-2 mb-1">
 											<CheckCircle2 className="h-5 w-5 text-success" />
-											<span className="text-sm font-medium">Modules</span>
+											<span className="text-sm font-medium">
+												{language === 'bm' ? 'Modul' : 'Modules'}
+											</span>
 										</div>
 										<p className="text-2xl font-bold text-neutralDark">
 											{course.completedModules} / {course.totalModules}
@@ -410,7 +440,7 @@ export default function ProgressPage() {
 										<p className="text-xs text-muted-foreground mt-1">
 											{course.totalModules > 0 
 												? Math.round((course.completedModules / course.totalModules) * 100) 
-												: 0}% completed
+												: 0}% {language === 'bm' ? 'selesai' : 'completed'}
 										</p>
 									</div>
 								</div>
@@ -421,11 +451,11 @@ export default function ProgressPage() {
 										<div className="flex items-center justify-between mb-4">
 											<h3 className="text-h4 font-semibold text-neutralDark flex items-center gap-2">
 												<ClipboardCheck className="h-5 w-5 text-info" />
-												Assessment Scores
+												{language === 'bm' ? 'Skor Penilaian' : 'Assessment Scores'}
 											</h3>
 											{course.avgAssessmentScore !== null && (
 												<span className="text-sm font-medium text-info">
-													Average: {course.avgAssessmentScore}%
+													{language === 'bm' ? 'Purata:' : 'Average:'} {course.avgAssessmentScore}%
 												</span>
 											)}
 										</div>
@@ -438,11 +468,36 @@ export default function ProgressPage() {
 													<div className="flex-1">
 														<p className="font-medium text-neutralDark">{submission.assessmentTitle}</p>
 														<p className="text-xs text-muted-foreground capitalize">
-															{submission.assessmentType} • Submitted: {formatDateTime(submission.submittedAt)}
+															{submission.assessmentType} • {language === 'bm' ? 'Dihantar:' : 'Submitted:'} {formatDateTime(submission.submittedAt)}
 														</p>
 													</div>
 													<div className="flex items-center gap-3">
-														{submission.score !== undefined && submission.totalPoints ? (
+														{submission.feedbackReleased && (submission.grade !== undefined || submission.feedback) ? (
+															<div className="text-right">
+																{submission.score !== undefined && submission.totalPoints ? (
+																	<>
+																		<p className="font-bold text-primary">
+																			{submission.score} / {submission.totalPoints}
+																		</p>
+																		<p className="text-xs text-muted-foreground">
+																			{Math.round((submission.score / submission.totalPoints) * 100)}%
+																		</p>
+																	</>
+																) : submission.grade !== undefined ? (
+																	<p className="font-bold text-primary">
+																		{submission.grade}%
+																	</p>
+																) : null}
+																{submission.feedback && (
+																	<details className="text-xs text-muted-foreground cursor-pointer mt-1">
+																		<summary className="hover:text-primary">
+																			{language === 'bm' ? 'Lihat maklum balas' : 'View feedback'}
+																		</summary>
+																		<div className="mt-2 p-2 bg-neutralLight rounded border" dangerouslySetInnerHTML={{ __html: submission.feedback }} />
+																	</details>
+																)}
+															</div>
+														) : submission.score !== undefined && submission.totalPoints ? (
 															<div className="text-right">
 																<p className="font-bold text-primary">
 																	{submission.score} / {submission.totalPoints}
@@ -450,9 +505,16 @@ export default function ProgressPage() {
 																<p className="text-xs text-muted-foreground">
 																	{Math.round((submission.score / submission.totalPoints) * 100)}%
 																</p>
+																{submission.feedback && !submission.feedbackReleased && (
+																	<p className="text-xs text-muted-foreground mt-1">
+																		{language === 'bm' ? 'Belum dilepaskan' : 'Not released'}
+																	</p>
+																)}
 															</div>
 														) : (
-															<span className="text-sm text-muted-foreground">Pending</span>
+															<span className="text-sm text-muted-foreground">
+																{language === 'bm' ? 'Menunggu' : 'Pending'}
+															</span>
 														)}
 													</div>
 												</div>
@@ -466,7 +528,7 @@ export default function ProgressPage() {
 									<div>
 										<h3 className="text-h4 font-semibold text-neutralDark flex items-center gap-2 mb-4">
 											<FileText className="h-5 w-5 text-secondary" />
-											Assignment Grades
+											{language === 'bm' ? 'Gred Tugasan' : 'Assignment Grades'}
 										</h3>
 										<div className="space-y-2">
 											{course.assignments.map((submission, idx) => (
@@ -477,23 +539,37 @@ export default function ProgressPage() {
 													<div className="flex-1">
 														<p className="font-medium text-neutralDark">{submission.assignmentTitle}</p>
 														<p className="text-xs text-muted-foreground">
-															Submitted: {formatDateTime(submission.submittedAt)}
+															{language === 'bm' ? 'Dihantar:' : 'Submitted:'} {formatDateTime(submission.submittedAt)}
 														</p>
 													</div>
 													<div className="flex items-center gap-3">
-														{submission.grade !== undefined ? (
+														{submission.feedbackReleased && submission.grade !== undefined ? (
 															<div className="text-right">
 																<p className="font-bold text-secondary">
 																	{submission.grade}%
 																</p>
 																{submission.feedback && (
-																	<p className="text-xs text-muted-foreground line-clamp-1">
-																		{submission.feedback}
-																	</p>
+																	<details className="text-xs text-muted-foreground cursor-pointer">
+																		<summary className="hover:text-primary">
+																			{language === 'bm' ? 'Lihat maklum balas' : 'View feedback'}
+																		</summary>
+																		<div className="mt-2 p-2 bg-neutralLight rounded border" dangerouslySetInnerHTML={{ __html: submission.feedback }} />
+																	</details>
 																)}
 															</div>
+														) : submission.grade !== undefined ? (
+															<div className="text-right">
+																<p className="font-bold text-secondary">
+																	{submission.grade}%
+																</p>
+																<p className="text-xs text-muted-foreground">
+																	{language === 'bm' ? 'Belum dilepaskan' : 'Not released'}
+																</p>
+															</div>
 														) : (
-															<span className="text-sm text-muted-foreground">Pending</span>
+															<span className="text-sm text-muted-foreground">
+																{language === 'bm' ? 'Menunggu' : 'Pending'}
+															</span>
 														)}
 													</div>
 												</div>
@@ -505,7 +581,11 @@ export default function ProgressPage() {
 								{/* Empty State for Assessments/Assignments */}
 								{course.assessments.length === 0 && course.assignments.length === 0 && (
 									<div className="text-center py-4 text-muted-foreground">
-										<p className="text-sm">No assessments or assignments completed yet.</p>
+										<p className="text-sm">
+											{language === 'bm' 
+												? 'Tiada penilaian atau tugasan yang selesai lagi.'
+												: 'No assessments or assignments completed yet.'}
+										</p>
 									</div>
 								)}
 							</CardContent>

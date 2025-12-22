@@ -1,0 +1,1380 @@
+==========================================
+COURSE 1: Introduction to Databases
+==========================================
+
+Course Title: Introduction to Databases
+Course Description: Learn the fundamentals of databases, data modeling, and how to organize information effectively. Perfect for beginners who want to understand what databases are and why they're essential in modern applications.
+
+Status: published
+
+---
+MODULE 1: What is a Database?
+---
+Module Title: What is a Database?
+Module Order: 1
+
+Lesson 1: Understanding Data and Information
+Lesson Title: Understanding Data and Information
+Lesson Order: 1
+Lesson Content:
+**What is Data?**
+Data refers to raw facts and figures that have no meaning on their own. Examples include:
+- Numbers: 25, 100, 3.14
+- Text: "John", "Database", "2024"
+- Dates: 2024-01-15
+
+**What is Information?**
+Information is processed data that has meaning and context. When we organize data in a meaningful way, it becomes information.
+
+**Example:**
+- Data: "John", "25", "Student"
+- Information: "John is a 25-year-old student"
+
+**Why Databases Matter**
+Databases help us:
+- Store large amounts of data efficiently
+- Organize data in a structured way
+- Retrieve information quickly
+- Maintain data integrity and consistency
+- Share data across multiple users and applications
+
+---
+
+Lesson 2: Types of Databases
+Lesson Title: Types of Databases
+Lesson Order: 2
+Lesson Content:
+**Relational Databases (SQL)**
+- Store data in tables with rows and columns
+- Use relationships between tables
+- Examples: MySQL, PostgreSQL, SQL Server
+- Best for: Structured data with clear relationships
+
+**NoSQL Databases**
+- Document databases (MongoDB)
+- Key-value stores (Redis)
+- Graph databases (Neo4j)
+- Best for: Flexible schemas, large-scale applications
+
+**File-based Storage**
+- CSV files
+- JSON files
+- Excel spreadsheets
+- Best for: Simple, small datasets
+
+**When to Use Which?**
+- Use Relational (SQL) for: Financial records, user accounts, structured business data
+- Use NoSQL for: Social media feeds, content management, real-time analytics
+
+---
+
+Lesson 3: Database Management Systems (DBMS)
+Lesson Title: Database Management Systems (DBMS)
+Lesson Order: 3
+Lesson Content:
+**What is a DBMS?**
+A Database Management System (DBMS) is software that helps you create, manage, and interact with databases.
+
+**Popular DBMS Options:**
+
+**MySQL**
+- Open-source, widely used
+- Great for web applications
+- Easy to learn and use
+
+**PostgreSQL**
+- Advanced features
+- Excellent for complex queries
+- Open-source and powerful
+
+**SQL Server**
+- Microsoft product
+- Enterprise-grade features
+- Windows-focused
+
+**SQLite**
+- Lightweight, file-based
+- Perfect for mobile apps
+- No server required
+
+**Key DBMS Functions:**
+- Data storage and retrieval
+- User access control
+- Data backup and recovery
+- Query optimization
+- Transaction management
+
+---
+
+---
+MODULE 2: Database Design Basics
+---
+Module Title: Database Design Basics
+Module Order: 2
+
+Lesson 1: Tables, Rows, and Columns
+Lesson Title: Tables, Rows, and Columns
+Lesson Order: 1
+Lesson Content:
+**Understanding Database Structure**
+
+**Tables**
+A table is a collection of related data organized in rows and columns. Think of it like a spreadsheet.
+
+**Example: Students Table**
+| student_id | name    | age | email              |
+|------------|---------|-----|-------------------|
+| 1          | Ali     | 16  | ali@example.com   |
+| 2          | Sarah   | 17  | sarah@example.com |
+| 3          | Ahmad   | 16  | ahmad@example.com |
+
+**Columns (Fields)**
+- Define what type of data is stored
+- Each column has a name and data type
+- Examples: name (text), age (number), email (text)
+
+**Rows (Records)**
+- Each row represents one complete set of data
+- Also called a "record" or "tuple"
+- In the example above, each row is one student
+
+**Primary Key**
+- A unique identifier for each row
+- In our example: student_id
+- Ensures no duplicate records
+
+---
+
+Lesson 2: Data Types
+Lesson Title: Data Types
+Lesson Order: 2
+Lesson Content:
+**Common Data Types in Databases**
+
+**Text Types:**
+- VARCHAR(n): Variable-length text (e.g., names, addresses)
+- TEXT: Long text (e.g., descriptions, comments)
+- CHAR(n): Fixed-length text
+
+**Numeric Types:**
+- INT: Whole numbers (e.g., age, quantity)
+- DECIMAL(p,s): Decimal numbers (e.g., price: 99.99)
+- FLOAT: Floating-point numbers
+
+**Date/Time Types:**
+- DATE: Date only (2024-01-15)
+- DATETIME: Date and time (2024-01-15 14:30:00)
+- TIMESTAMP: Automatic timestamp
+
+**Boolean Types:**
+- BOOLEAN: True or False (e.g., is_active, is_published)
+
+**Example Table with Data Types:**
+```
+Products Table:
+- product_id (INT) - Primary Key
+- product_name (VARCHAR(100))
+- price (DECIMAL(10,2))
+- in_stock (BOOLEAN)
+- created_at (DATETIME)
+```
+
+**Choosing the Right Data Type:**
+- Use appropriate types for better performance
+- Prevents invalid data entry
+- Saves storage space
+
+---
+
+Lesson 3: Relationships Between Tables
+Lesson Title: Relationships Between Tables
+Lesson Order: 3
+Lesson Content:
+**Understanding Table Relationships**
+
+**One-to-Many Relationship**
+One record in Table A relates to many records in Table B.
+
+**Example:**
+- One Course can have many Students
+- One Teacher can teach many Courses
+
+**Many-to-Many Relationship**
+Many records in Table A relate to many records in Table B.
+
+**Example:**
+- Students can enroll in many Courses
+- Courses can have many Students
+
+**One-to-One Relationship**
+One record in Table A relates to exactly one record in Table B.
+
+**Example:**
+- One Student has one Profile
+- One User has one Account
+
+**Foreign Keys**
+A foreign key links tables together by referencing the primary key of another table.
+
+**Example:**
+Students Table:
+- student_id (Primary Key)
+- name
+- course_id (Foreign Key → Courses Table)
+
+This creates a relationship: Each student belongs to one course.
+
+---
+
+==========================================
+COURSE 2: SQL Fundamentals
+==========================================
+
+Course Title: SQL Fundamentals
+Course Description: Master the Structured Query Language (SQL) to interact with databases. Learn to create, read, update, and delete data using SQL commands. Build a strong foundation for database management and data analysis.
+
+Status: published
+
+---
+MODULE 1: SQL Basics
+---
+Module Title: SQL Basics
+Module Order: 1
+
+Lesson 1: Introduction to SQL
+Lesson Title: Introduction to SQL
+Lesson Order: 1
+Lesson Content:
+**What is SQL?**
+SQL (Structured Query Language) is a programming language designed for managing and manipulating relational databases.
+
+**Key Facts:**
+- SQL is used to communicate with databases
+- It's a standard language (works with most DBMS)
+- Pronounced as "sequel" or "S-Q-L"
+
+**What Can SQL Do?**
+- Create databases and tables
+- Insert, update, and delete data
+- Query (retrieve) data
+- Manage user permissions
+- Create views and stored procedures
+
+**SQL Categories:**
+
+**DDL (Data Definition Language)**
+- CREATE: Create databases, tables
+- ALTER: Modify existing structures
+- DROP: Delete databases, tables
+
+**DML (Data Manipulation Language)**
+- SELECT: Retrieve data
+- INSERT: Add new data
+- UPDATE: Modify existing data
+- DELETE: Remove data
+
+**DCL (Data Control Language)**
+- GRANT: Give permissions
+- REVOKE: Remove permissions
+
+---
+
+Lesson 2: SELECT Statement
+Lesson Title: SELECT Statement
+Lesson Order: 2
+Lesson Content:
+**The SELECT Statement**
+SELECT is used to retrieve data from a database.
+
+**Basic Syntax:**
+```sql
+SELECT column1, column2
+FROM table_name;
+```
+
+**Examples:**
+
+**Select All Columns:**
+```sql
+SELECT * FROM students;
+```
+Returns all columns and all rows from the students table.
+
+**Select Specific Columns:**
+```sql
+SELECT name, email FROM students;
+```
+Returns only name and email columns.
+
+**Select with WHERE Clause:**
+```sql
+SELECT * FROM students WHERE age > 16;
+```
+Returns only students older than 16.
+
+**Select with ORDER BY:**
+```sql
+SELECT * FROM students ORDER BY name ASC;
+```
+Returns students sorted by name in ascending order.
+
+**Common WHERE Operators:**
+- = (equals)
+- > (greater than)
+- < (less than)
+- >= (greater than or equal)
+- <= (less than or equal)
+- != or <> (not equal)
+- LIKE (pattern matching)
+
+---
+
+Lesson 3: INSERT, UPDATE, DELETE
+Lesson Title: INSERT, UPDATE, DELETE
+Lesson Order: 3
+Lesson Content:
+**INSERT Statement**
+Add new records to a table.
+
+**Syntax:**
+```sql
+INSERT INTO table_name (column1, column2, column3)
+VALUES (value1, value2, value3);
+```
+
+**Example:**
+```sql
+INSERT INTO students (name, age, email)
+VALUES ('Ali', 16, 'ali@example.com');
+```
+
+**Insert Multiple Rows:**
+```sql
+INSERT INTO students (name, age, email)
+VALUES 
+  ('Sarah', 17, 'sarah@example.com'),
+  ('Ahmad', 16, 'ahmad@example.com');
+```
+
+**UPDATE Statement**
+Modify existing records.
+
+**Syntax:**
+```sql
+UPDATE table_name
+SET column1 = value1, column2 = value2
+WHERE condition;
+```
+
+**Example:**
+```sql
+UPDATE students
+SET age = 18
+WHERE name = 'Ali';
+```
+
+**⚠️ Important:** Always use WHERE clause, or you'll update ALL rows!
+
+**DELETE Statement**
+Remove records from a table.
+
+**Syntax:**
+```sql
+DELETE FROM table_name
+WHERE condition;
+```
+
+**Example:**
+```sql
+DELETE FROM students
+WHERE age < 16;
+```
+
+**⚠️ Warning:** DELETE is permanent! Always use WHERE clause.
+
+---
+
+---
+MODULE 2: Advanced SQL Queries
+---
+Module Title: Advanced SQL Queries
+Module Order: 2
+
+Lesson 1: JOIN Operations
+Lesson Title: JOIN Operations
+Lesson Order: 1
+Lesson Content:
+**Understanding JOINs**
+JOINs combine rows from two or more tables based on a related column.
+
+**Types of JOINs:**
+
+**INNER JOIN**
+Returns only matching rows from both tables.
+
+**Example:**
+```sql
+SELECT students.name, courses.title
+FROM students
+INNER JOIN courses ON students.course_id = courses.course_id;
+```
+
+**LEFT JOIN**
+Returns all rows from the left table, and matching rows from the right table.
+
+**Example:**
+```sql
+SELECT students.name, courses.title
+FROM students
+LEFT JOIN courses ON students.course_id = courses.course_id;
+```
+This shows all students, even if they're not enrolled in any course.
+
+**RIGHT JOIN**
+Returns all rows from the right table, and matching rows from the left table.
+
+**FULL OUTER JOIN**
+Returns all rows when there's a match in either table.
+
+**Visual Example:**
+```
+Table A:        Table B:
+[1, 2, 3]      [2, 3, 4]
+
+INNER JOIN: [2, 3] (only matches)
+LEFT JOIN:  [1, 2, 3] (all from A)
+RIGHT JOIN: [2, 3, 4] (all from B)
+```
+
+---
+
+Lesson 2: Aggregate Functions
+Lesson Title: Aggregate Functions
+Lesson Order: 2
+Lesson Content:
+**Aggregate Functions**
+Perform calculations on a set of values and return a single value.
+
+**Common Aggregate Functions:**
+
+**COUNT()**
+Counts the number of rows.
+
+**Example:**
+```sql
+SELECT COUNT(*) FROM students;
+```
+Returns total number of students.
+
+**SUM()**
+Calculates the sum of numeric values.
+
+**Example:**
+```sql
+SELECT SUM(price) FROM products;
+```
+
+**AVG()**
+Calculates the average of numeric values.
+
+**Example:**
+```sql
+SELECT AVG(age) FROM students;
+```
+
+**MAX() and MIN()**
+Find maximum and minimum values.
+
+**Example:**
+```sql
+SELECT MAX(age) FROM students;
+SELECT MIN(price) FROM products;
+```
+
+**GROUP BY**
+Groups rows that have the same values.
+
+**Example:**
+```sql
+SELECT course_id, COUNT(*) as student_count
+FROM students
+GROUP BY course_id;
+```
+Shows how many students are in each course.
+
+**HAVING Clause**
+Filters groups (similar to WHERE, but for groups).
+
+**Example:**
+```sql
+SELECT course_id, COUNT(*) as student_count
+FROM students
+GROUP BY course_id
+HAVING COUNT(*) > 5;
+```
+Shows only courses with more than 5 students.
+
+---
+
+Lesson 3: Subqueries
+Lesson Title: Subqueries
+Lesson Order: 3
+Lesson Content:
+**What are Subqueries?**
+A subquery is a query nested inside another query.
+
+**Types of Subqueries:**
+
+**Scalar Subquery**
+Returns a single value.
+
+**Example:**
+```sql
+SELECT name, age
+FROM students
+WHERE age > (SELECT AVG(age) FROM students);
+```
+Finds students older than the average age.
+
+**Row Subquery**
+Returns a single row.
+
+**Column Subquery**
+Returns a single column.
+
+**Table Subquery**
+Returns a table (used with FROM or JOIN).
+
+**Example:**
+```sql
+SELECT s.name, c.title
+FROM students s
+WHERE s.course_id IN (
+  SELECT course_id 
+  FROM courses 
+  WHERE status = 'published'
+);
+```
+
+**EXISTS Subquery**
+Checks if a subquery returns any rows.
+
+**Example:**
+```sql
+SELECT name
+FROM students s
+WHERE EXISTS (
+  SELECT 1 
+  FROM enrollments e 
+  WHERE e.student_id = s.student_id
+);
+```
+Finds students who have enrollments.
+
+**Best Practices:**
+- Use subqueries when they make the query clearer
+- Consider performance - sometimes JOINs are faster
+- Test subqueries independently first
+
+---
+
+---
+MODULE 3: Database Operations
+---
+Module Title: Database Operations
+Module Order: 3
+
+Lesson 1: Creating Tables
+Lesson Title: Creating Tables
+Lesson Order: 1
+Lesson Content:
+**CREATE TABLE Statement**
+Creates a new table in the database.
+
+**Basic Syntax:**
+```sql
+CREATE TABLE table_name (
+  column1 datatype constraints,
+  column2 datatype constraints,
+  ...
+);
+```
+
+**Example:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  age INT,
+  email VARCHAR(255) UNIQUE,
+  course_id INT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Common Constraints:**
+- PRIMARY KEY: Uniquely identifies each row
+- NOT NULL: Column cannot be empty
+- UNIQUE: All values must be unique
+- DEFAULT: Sets a default value
+- FOREIGN KEY: Links to another table
+- AUTO_INCREMENT: Automatically increments (MySQL)
+
+**Data Types Review:**
+- INT: Integer numbers
+- VARCHAR(n): Variable-length text
+- DATETIME: Date and time
+- BOOLEAN: True/False
+- DECIMAL(p,s): Decimal numbers
+
+---
+
+Lesson 2: Modifying Tables
+Lesson Title: Modifying Tables
+Lesson Order: 2
+Lesson Content:
+**ALTER TABLE Statement**
+Modifies an existing table structure.
+
+**Add a Column:**
+```sql
+ALTER TABLE students
+ADD COLUMN phone VARCHAR(20);
+```
+
+**Drop a Column:**
+```sql
+ALTER TABLE students
+DROP COLUMN phone;
+```
+
+**Modify a Column:**
+```sql
+ALTER TABLE students
+MODIFY COLUMN email VARCHAR(300);
+```
+
+**Add a Constraint:**
+```sql
+ALTER TABLE students
+ADD CONSTRAINT fk_course
+FOREIGN KEY (course_id) REFERENCES courses(course_id);
+```
+
+**Drop a Constraint:**
+```sql
+ALTER TABLE students
+DROP CONSTRAINT fk_course;
+```
+
+**Rename a Table:**
+```sql
+ALTER TABLE students
+RENAME TO learners;
+```
+
+**⚠️ Important Notes:**
+- Always backup data before altering tables
+- Some changes may require data migration
+- Test ALTER statements on a copy first
+
+---
+
+Lesson 3: Indexes and Performance
+Lesson Title: Indexes and Performance
+Lesson Order: 3
+Lesson Content:
+**What are Indexes?**
+Indexes improve the speed of data retrieval operations on a database table.
+
+**Think of it like:**
+- A book index helps you find pages quickly
+- A database index helps you find rows quickly
+
+**Creating an Index:**
+```sql
+CREATE INDEX idx_email ON students(email);
+```
+
+**Creating a Unique Index:**
+```sql
+CREATE UNIQUE INDEX idx_email ON students(email);
+```
+
+**Composite Index (Multiple Columns):**
+```sql
+CREATE INDEX idx_name_age ON students(name, age);
+```
+
+**When to Use Indexes:**
+✅ Use indexes on:
+- Frequently searched columns
+- Foreign keys
+- Columns used in WHERE clauses
+- Columns used in JOINs
+
+❌ Don't over-index:
+- Small tables (may slow down INSERT/UPDATE)
+- Columns that change frequently
+- Columns rarely used in queries
+
+**Viewing Indexes:**
+```sql
+SHOW INDEXES FROM students;
+```
+
+**Dropping an Index:**
+```sql
+DROP INDEX idx_email ON students;
+```
+
+**Performance Tips:**
+- Indexes speed up SELECT queries
+- Indexes slow down INSERT/UPDATE/DELETE
+- Find the right balance for your use case
+
+---
+
+==========================================
+COURSE 3: Advanced Database Design
+==========================================
+
+Course Title: Advanced Database Design
+Course Description: Learn advanced database design principles, normalization, optimization techniques, and best practices for building scalable and efficient database systems. Perfect for those ready to design production-ready databases.
+
+Status: published
+
+---
+MODULE 1: Database Normalization
+---
+Module Title: Database Normalization
+Module Order: 1
+
+Lesson 1: Introduction to Normalization
+Lesson Title: Introduction to Normalization
+Lesson Order: 1
+Lesson Content:
+<h2>What is Normalization?</h2>
+<p>Normalization is the process of organizing data in a database to reduce redundancy and improve data integrity. Think of it as organizing your files into folders - it makes everything easier to find and maintain.</p>
+
+<h3>Why Normalize?</h3>
+<ul>
+<li><strong>Eliminates data redundancy</strong> - No more repeating the same information</li>
+<li><strong>Prevents data inconsistencies</strong> - One source of truth for each piece of data</li>
+<li><strong>Reduces storage space</strong> - More efficient database</li>
+<li><strong>Makes updates easier</strong> - Update once, changes everywhere</li>
+<li><strong>Improves data integrity</strong> - Less chance of errors</li>
+</ul>
+
+<h3>Example: Before Normalization</h3>
+<p>Imagine a students table with redundant teacher information:</p>
+<table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+<tr><th>student_id</th><th>name</th><th>course_name</th><th>teacher_name</th><th>teacher_email</th></tr>
+<tr><td>1</td><td>Ali</td><td>Database</td><td>Dr. Smith</td><td>smith@edu.com</td></tr>
+<tr><td>2</td><td>Sarah</td><td>Database</td><td>Dr. Smith</td><td>smith@edu.com</td></tr>
+<tr><td>3</td><td>Ahmad</td><td>Database</td><td>Dr. Smith</td><td>smith@edu.com</td></tr>
+</table>
+<p><strong>Problem:</strong> Teacher information is repeated for every student! If Dr. Smith changes email, we need to update 3 rows.</p>
+
+<h3>After Normalization</h3>
+<p>Split into separate tables:</p>
+<p><strong>Students Table:</strong></p>
+<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">
+<tr><th>student_id</th><th>name</th><th>course_id</th></tr>
+<tr><td>1</td><td>Ali</td><td>1</td></tr>
+<tr><td>2</td><td>Sarah</td><td>1</td></tr>
+<tr><td>3</td><td>Ahmad</td><td>1</td></tr>
+</table>
+
+<p><strong>Courses Table:</strong></p>
+<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">
+<tr><th>course_id</th><th>course_name</th><th>teacher_id</th></tr>
+<tr><td>1</td><td>Database</td><td>101</td></tr>
+</table>
+
+<p><strong>Teachers Table:</strong></p>
+<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">
+<tr><th>teacher_id</th><th>teacher_name</th><th>teacher_email</th></tr>
+<tr><td>101</td><td>Dr. Smith</td><td>smith@edu.com</td></tr>
+</table>
+
+<p><strong>Benefit:</strong> Now if Dr. Smith changes email, we only update 1 row!</p>
+
+<h3>Normal Forms</h3>
+<p>Database normalization follows a series of rules called "normal forms":</p>
+<ul>
+<li><strong>First Normal Form (1NF)</strong> - Basic structure</li>
+<li><strong>Second Normal Form (2NF)</strong> - Remove partial dependencies</li>
+<li><strong>Third Normal Form (3NF)</strong> - Remove transitive dependencies</li>
+<li><strong>Boyce-Codd Normal Form (BCNF)</strong> - Advanced 3NF</li>
+<li><strong>Fourth Normal Form (4NF)</strong> - Handle multi-valued dependencies</li>
+<li><strong>Fifth Normal Form (5NF)</strong> - Handle join dependencies</li>
+</ul>
+<p>We'll explore these in detail in the next lessons!</p>
+
+---
+
+Lesson 2: First Normal Form (1NF)
+Lesson Title: First Normal Form (1NF)
+Lesson Order: 2
+Lesson Content:
+**First Normal Form (1NF) Rules:**
+1. Each column must contain atomic (indivisible) values
+2. Each row must be unique
+3. No repeating groups
+
+**Example - Violating 1NF:**
+```
+Students Table:
+| student_id | name | courses              |
+|------------|------|---------------------|
+| 1          | Ali  | Database, Python    |
+| 2          | Sarah| Database            |
+```
+
+Problem: The "courses" column contains multiple values (not atomic).
+
+**Fixed - Following 1NF:**
+```
+Students Table:
+| student_id | name |
+|------------|------|
+| 1          | Ali  |
+| 2          | Sarah|
+
+Enrollments Table:
+| student_id | course_name |
+|------------|-------------|
+| 1          | Database    |
+| 1          | Python      |
+| 2          | Database    |
+```
+
+**Another Example - Repeating Groups:**
+```
+❌ Bad (Violates 1NF):
+| student_id | name | course1 | course2 | course3 |
+|------------|------|---------|---------|---------|
+| 1          | Ali  | DB      | Python  | NULL    |
+
+✅ Good (Follows 1NF):
+| student_id | name |
+|------------|------|
+| 1          | Ali  |
+
+| student_id | course_name |
+|------------|-------------|
+| 1          | DB          |
+| 1          | Python      |
+```
+
+**Key Points:**
+- Each cell should contain only one value
+- No arrays or lists in columns
+- Create separate tables for related data
+
+---
+
+Lesson 3: Second and Third Normal Form
+Lesson Title: Second and Third Normal Form
+Lesson Order: 3
+Lesson Content:
+**Second Normal Form (2NF)**
+A table is in 2NF if:
+- It's in 1NF
+- All non-key attributes are fully dependent on the primary key
+
+**Example - Violating 2NF:**
+```
+Enrollments Table:
+| enrollment_id | student_id | course_id | course_name | student_name |
+|---------------|------------|-----------|-------------|--------------|
+| 1             | 1          | 101       | Database    | Ali          |
+| 2             | 2          | 101       | Database    | Sarah        |
+```
+
+Problem: course_name depends on course_id, not enrollment_id.
+
+**Fixed - Following 2NF:**
+```
+Enrollments Table:
+| enrollment_id | student_id | course_id |
+|---------------|------------|-----------|
+| 1             | 1          | 101       |
+| 2             | 2          | 101       |
+
+Courses Table:
+| course_id | course_name |
+|-----------|-------------|
+| 101       | Database    |
+```
+
+**Third Normal Form (3NF)**
+A table is in 3NF if:
+- It's in 2NF
+- No transitive dependencies (non-key attributes don't depend on other non-key attributes)
+
+**Example - Violating 3NF:**
+```
+Students Table:
+| student_id | name | course_id | course_name | teacher_id | teacher_name |
+|------------|------|-----------|-------------|------------|--------------|
+| 1          | Ali  | 101       | Database    | 201        | Dr. Smith    |
+```
+
+Problem: teacher_name depends on teacher_id, not student_id.
+
+**Fixed - Following 3NF:**
+```
+Students Table:
+| student_id | name | course_id |
+|------------|------|-----------|
+| 1          | Ali  | 101       |
+
+Courses Table:
+| course_id | course_name | teacher_id |
+|-----------|-------------|------------|
+| 101       | Database    | 201        |
+
+Teachers Table:
+| teacher_id | teacher_name |
+|------------|--------------|
+| 201        | Dr. Smith    |
+```
+
+**Benefits of Normalization:**
+- Reduces data duplication
+- Prevents update anomalies
+- Ensures data consistency
+- Makes database more maintainable
+
+---
+
+---
+MODULE 2: Database Relationships and Constraints
+---
+Module Title: Database Relationships and Constraints
+Module Order: 2
+
+Lesson 1: Foreign Keys and Referential Integrity
+Lesson Title: Foreign Keys and Referential Integrity
+Lesson Order: 1
+Lesson Content:
+<h2>What are Foreign Keys?</h2>
+<p>A foreign key is a column that references the primary key of another table, establishing a relationship between tables. Think of it as a "link" that connects related data across tables.</p>
+
+<h3>Example</h3>
+<pre><code>CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  name VARCHAR(100),
+  course_id INT,
+  FOREIGN KEY (course_id) REFERENCES courses(course_id)
+);</code></pre>
+<p>Here, <code>course_id</code> in the students table is a foreign key that references <code>course_id</code> in the courses table.</p>
+
+<h2>Referential Integrity</h2>
+<p>Referential integrity ensures that relationships between tables remain consistent and valid.</p>
+
+<h3>Rules of Referential Integrity</h3>
+<ul>
+<li>You <strong>cannot insert</strong> a foreign key value that doesn't exist in the referenced table</li>
+<li>You <strong>cannot delete</strong> a referenced row if other rows depend on it (unless using CASCADE)</li>
+</ul>
+
+<h3>CASCADE Options</h3>
+<p>When you delete a parent record, what happens to child records? You can control this with CASCADE options:</p>
+
+<h4>ON DELETE CASCADE</h4>
+<pre><code>FOREIGN KEY (course_id) 
+REFERENCES courses(course_id)
+ON DELETE CASCADE</code></pre>
+<p><strong>Effect:</strong> If a course is deleted, all related students are also deleted automatically.</p>
+<p><strong>Use when:</strong> Child records have no meaning without the parent (e.g., order items without an order)</p>
+
+<h4>ON DELETE SET NULL</h4>
+<pre><code>FOREIGN KEY (course_id) 
+REFERENCES courses(course_id)
+ON DELETE SET NULL</code></pre>
+<p><strong>Effect:</strong> If a course is deleted, <code>course_id</code> in students becomes <code>NULL</code>.</p>
+<p><strong>Use when:</strong> Child records can exist independently (e.g., students can exist without a course)</p>
+
+<h4>ON DELETE RESTRICT (Default)</h4>
+<p><strong>Effect:</strong> Prevents deletion if there are dependent rows. You must delete child records first.</p>
+<p><strong>Use when:</strong> You want to prevent accidental data loss</p>
+
+<h4>ON UPDATE CASCADE</h4>
+<p><strong>Effect:</strong> If the primary key changes, foreign keys are automatically updated.</p>
+<p><strong>Use when:</strong> Primary keys might change (rare, but possible)</p>
+
+<h3>Best Practices</h3>
+<ul>
+<li>Always define foreign keys for relationships - they protect your data</li>
+<li>Choose appropriate CASCADE options based on your business logic</li>
+<li>Test deletion scenarios carefully before deploying</li>
+<li>Document your CASCADE choices for future developers</li>
+</ul>
+
+---
+
+Lesson 2: Many-to-Many Relationships
+Lesson Title: Many-to-Many Relationships
+Lesson Order: 2
+Lesson Content:
+**Understanding Many-to-Many**
+
+**Scenario:**
+- Students can enroll in multiple courses
+- Courses can have multiple students
+
+**Problem:**
+You can't put multiple course_ids in one student row, and you can't put multiple student_ids in one course row.
+
+**Solution: Junction Table (Bridge Table)**
+
+**Tables:**
+```
+Students Table:
+| student_id | name |
+|------------|------|
+| 1          | Ali  |
+| 2          | Sarah|
+
+Courses Table:
+| course_id | title |
+|-----------|-------|
+| 101       | Database |
+| 102       | Python   |
+
+Enrollments Table (Junction):
+| enrollment_id | student_id | course_id | enrolled_at |
+|---------------|------------|-----------|-------------|
+| 1             | 1          | 101       | 2024-01-15  |
+| 2             | 1          | 102       | 2024-01-16  |
+| 3             | 2          | 101       | 2024-01-15  |
+```
+
+**Creating Junction Table:**
+```sql
+CREATE TABLE enrollments (
+  enrollment_id INT PRIMARY KEY AUTO_INCREMENT,
+  student_id INT,
+  course_id INT,
+  enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES students(student_id),
+  FOREIGN KEY (course_id) REFERENCES courses(course_id),
+  UNIQUE(student_id, course_id) -- Prevents duplicate enrollments
+);
+```
+
+**Querying Many-to-Many:**
+```sql
+-- Find all courses for a student
+SELECT c.title
+FROM courses c
+INNER JOIN enrollments e ON c.course_id = e.course_id
+WHERE e.student_id = 1;
+
+-- Find all students in a course
+SELECT s.name
+FROM students s
+INNER JOIN enrollments e ON s.student_id = e.student_id
+WHERE e.course_id = 101;
+```
+
+**Junction Table Best Practices:**
+- Include a primary key (enrollment_id)
+- Add foreign keys to both related tables
+- Use UNIQUE constraint to prevent duplicates
+- Can include additional fields (enrolled_at, grade, etc.)
+
+---
+
+Lesson 3: Constraints and Data Validation
+Lesson Title: Constraints and Data Validation
+Lesson Order: 3
+Lesson Content:
+**Database Constraints**
+Constraints enforce rules on data to maintain integrity and accuracy.
+
+**Primary Key Constraint:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  name VARCHAR(100)
+);
+```
+- Ensures uniqueness
+- Cannot be NULL
+- Only one per table
+
+**Unique Constraint:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  email VARCHAR(255) UNIQUE
+);
+```
+- Ensures all values are unique
+- Allows NULL (but only one NULL)
+
+**NOT NULL Constraint:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  age INT
+);
+```
+- Prevents NULL values
+- Ensures required fields are filled
+
+**CHECK Constraint:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  age INT CHECK (age >= 16 AND age <= 25),
+  email VARCHAR(255) CHECK (email LIKE '%@%.%')
+);
+```
+- Validates data against a condition
+- Ensures data meets business rules
+
+**Default Constraint:**
+```sql
+CREATE TABLE students (
+  student_id INT PRIMARY KEY,
+  status VARCHAR(20) DEFAULT 'active',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+- Sets a default value if none is provided
+
+**Composite Constraints:**
+```sql
+CREATE TABLE enrollments (
+  student_id INT,
+  course_id INT,
+  PRIMARY KEY (student_id, course_id),
+  FOREIGN KEY (student_id) REFERENCES students(student_id),
+  FOREIGN KEY (course_id) REFERENCES courses(course_id)
+);
+```
+
+**Benefits of Constraints:**
+- Prevents invalid data entry
+- Maintains data integrity
+- Enforces business rules at database level
+- Reduces application-level validation code
+
+---
+
+---
+MODULE 3: Database Optimization
+---
+Module Title: Database Optimization
+Module Order: 3
+
+Lesson 1: Query Optimization
+Lesson Title: Query Optimization
+Lesson Order: 1
+Lesson Content:
+<h2>Why Optimize Queries?</h2>
+<p>Query optimization is crucial for database performance. Here's why it matters:</p>
+<ul>
+<li><strong>Faster response times</strong> - Users get results instantly</li>
+<li><strong>Better user experience</strong> - No waiting, no frustration</li>
+<li><strong>Reduced server load</strong> - Handle more users with same resources</li>
+<li><strong>Lower costs</strong> - Efficient queries use less server resources</li>
+</ul>
+
+<h2>Optimization Techniques</h2>
+
+<h3>1. Use Indexes Wisely</h3>
+<p>Indexes are like a book's index - they help find data quickly:</p>
+<pre><code>-- Create index on frequently searched columns
+CREATE INDEX idx_email ON students(email);
+
+-- Use index in WHERE clause
+SELECT * FROM students WHERE email = 'ali@example.com';</code></pre>
+<p><strong>Tip:</strong> Index columns used in WHERE, JOIN, and ORDER BY clauses.</p>
+
+<h3>2. Avoid SELECT *</h3>
+<p>Only retrieve the columns you actually need:</p>
+<pre><code>-- ❌ Bad: Retrieves all columns (wastes bandwidth)
+SELECT * FROM students;
+
+-- ✅ Good: Only get what you need
+SELECT name, email FROM students;</code></pre>
+
+<h3>3. Use LIMIT for Large Results</h3>
+<pre><code>-- ❌ Bad: Returns all 10,000 students
+SELECT * FROM students;
+
+-- ✅ Good: Only get first 10
+SELECT * FROM students LIMIT 10;</code></pre>
+
+<h3>4. Optimize JOINs</h3>
+<pre><code>-- Use INNER JOIN instead of WHERE for better performance
+SELECT s.name, c.title
+FROM students s
+INNER JOIN courses c ON s.course_id = c.course_id;</code></pre>
+
+<h3>5. Use WHERE Before JOIN</h3>
+<p>Filter early to reduce the amount of data processed:</p>
+<pre><code>-- Filter early to reduce data processed
+SELECT s.name, c.title
+FROM students s
+INNER JOIN courses c ON s.course_id = c.course_id
+WHERE s.age > 16;</code></pre>
+
+<h3>6. Avoid Functions in WHERE Clause</h3>
+<pre><code>-- ❌ Bad: Can't use index (function prevents index usage)
+SELECT * FROM students WHERE YEAR(created_at) = 2024;
+
+-- ✅ Good: Can use index (direct comparison)
+SELECT * FROM students 
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01';</code></pre>
+
+<h3>Query Execution Plan</h3>
+<p>Use <code>EXPLAIN</code> to see how the database executes your query:</p>
+<pre><code>EXPLAIN SELECT * FROM students WHERE email = 'ali@example.com';</code></pre>
+<p>This shows you which indexes are used and helps identify slow queries.</p>
+
+---
+
+Lesson 2: Indexing Strategies
+Lesson Title: Indexing Strategies
+Lesson Order: 2
+Lesson Content:
+**Indexing Best Practices**
+
+**When to Create Indexes:**
+✅ Primary keys (automatically indexed)
+✅ Foreign keys
+✅ Frequently searched columns
+✅ Columns used in WHERE clauses
+✅ Columns used in JOIN conditions
+✅ Columns used in ORDER BY
+
+**When NOT to Create Indexes:**
+❌ Small tables (< 100 rows)
+❌ Columns rarely used in queries
+❌ Columns with few unique values (like gender: M/F)
+❌ Columns frequently updated
+
+**Types of Indexes:**
+
+**Single Column Index:**
+```sql
+CREATE INDEX idx_name ON students(name);
+```
+
+**Composite Index (Multiple Columns):**
+```sql
+CREATE INDEX idx_name_age ON students(name, age);
+```
+Order matters! Use most selective column first.
+
+**Unique Index:**
+```sql
+CREATE UNIQUE INDEX idx_email ON students(email);
+```
+
+**Partial Index (Filtered):**
+```sql
+CREATE INDEX idx_active_students ON students(name) 
+WHERE status = 'active';
+```
+
+**Index Maintenance:**
+- Indexes take up storage space
+- Slow down INSERT/UPDATE/DELETE operations
+- Need to be rebuilt periodically (some DBMS do this automatically)
+- Monitor index usage and remove unused indexes
+
+**Monitoring Index Usage:**
+```sql
+-- MySQL: Check index usage
+SHOW INDEX FROM students;
+
+-- PostgreSQL: Query system tables
+SELECT * FROM pg_stat_user_indexes;
+```
+
+---
+
+Lesson 3: Database Maintenance
+Lesson Title: Database Maintenance
+Lesson Order: 3
+Lesson Content:
+**Regular Database Maintenance Tasks**
+
+**1. Backups**
+Regular backups are essential for data protection.
+
+**Types of Backups:**
+- Full Backup: Complete database copy
+- Incremental Backup: Only changed data since last backup
+- Differential Backup: All changes since last full backup
+
+**Backup Best Practices:**
+- Schedule automatic backups
+- Test restore procedures regularly
+- Store backups in multiple locations
+- Keep backup history (daily, weekly, monthly)
+
+**2. Database Optimization**
+```sql
+-- MySQL: Optimize tables
+OPTIMIZE TABLE students;
+
+-- Rebuild indexes
+ALTER TABLE students ENGINE=InnoDB;
+```
+
+**3. Monitor Performance**
+- Track slow queries
+- Monitor database size
+- Check connection counts
+- Review error logs
+
+**4. Update Statistics**
+```sql
+-- Update query optimizer statistics
+ANALYZE TABLE students;
+```
+
+**5. Clean Up Old Data**
+```sql
+-- Archive old records
+CREATE TABLE students_archive AS 
+SELECT * FROM students WHERE created_at < '2020-01-01';
+
+-- Delete archived data
+DELETE FROM students WHERE created_at < '2020-01-01';
+```
+
+**6. Security Maintenance**
+- Regularly update database software
+- Review user permissions
+- Change default passwords
+- Monitor for suspicious activity
+
+**Maintenance Schedule:**
+- Daily: Backups, error log review
+- Weekly: Performance monitoring, index analysis
+- Monthly: Full optimization, security audit
+- Quarterly: Capacity planning, archive old data
+
+**Tools for Maintenance:**
+- Database management tools (phpMyAdmin, pgAdmin)
+- Monitoring tools (Prometheus, Grafana)
+- Backup tools (mysqldump, pg_dump)
+- Performance analyzers (EXPLAIN, Query Profiler)
+
+---
+
+==========================================
+END OF SAMPLE DATA
+==========================================
+

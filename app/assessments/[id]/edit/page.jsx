@@ -310,19 +310,36 @@ export default function EditAssessmentPage() {
 				throw new Error('You must be signed in to update assessments');
 			}
 
-			const assessmentData = {
+			// Helper function to remove undefined values
+			const removeUndefined = (obj) => {
+				if (obj === null || typeof obj !== 'object') return obj;
+				if (Array.isArray(obj)) return obj.map(removeUndefined);
+				return Object.fromEntries(
+					Object.entries(obj)
+						.map(([key, value]) => [key, removeUndefined(value)])
+						.filter(([_, value]) => value !== undefined)
+				);
+			};
+
+			const assessmentData = removeUndefined({
 				title: title.trim(),
 				description: description.trim() || '',
 				courseId,
 				courseTitle,
 				type,
-				questions: questions.map(q => ({
-					type: q.type,
-					question: q.question.trim(),
-					options: q.type === 'mcq' ? q.options.map(opt => opt.trim()) : undefined,
-					correctAnswer: q.type === 'mcq' ? q.correctAnswer : q.correctAnswer || '',
-					points: q.points || 1,
-				})),
+				questions: questions.map(q => {
+					const questionData = {
+						type: q.type,
+						question: q.question.trim(),
+						correctAnswer: q.type === 'mcq' ? q.correctAnswer : (q.correctAnswer || ''),
+						points: q.points || 1,
+					};
+					// Only include options for MCQ questions
+					if (q.type === 'mcq') {
+						questionData.options = q.options.map(opt => opt.trim());
+					}
+					return questionData;
+				}),
 				published,
 				updatedAt: serverTimestamp(),
 				config: {
@@ -331,7 +348,7 @@ export default function EditAssessmentPage() {
 					timer: config.timer ? parseInt(config.timer) : null,
 					attempts: config.attempts ? parseInt(config.attempts) : null,
 				},
-			};
+			});
 
 			await updateDoc(doc(db, 'assessment', assessmentId), assessmentData);
 
@@ -784,4 +801,3 @@ export default function EditAssessmentPage() {
 		</div>
 	);
 }
-

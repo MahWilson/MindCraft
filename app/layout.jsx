@@ -22,28 +22,28 @@ function getNavItems(role) {
 			{ href: '/admin/users', label: 'Manage Users' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
 			{ href: '/admin/settings', label: 'Settings' },
-			{ href: '/dashboard/modules', label: 'Module Library' },
-			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/analytics', label: 'Analytics' },
+			{ href: '/forum', label: 'Forum' },
 		];
 	} else if (role === 'teacher') {
 		return [
 			{ href: '/dashboard/teacher', label: 'Dashboard' },
 			{ href: '/dashboard/courses/new', label: 'Create Course' },
 			{ href: '/admin/courses', label: 'Manage Courses' },
-			{ href: '/dashboard/modules', label: 'Module Library' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/analytics', label: 'Analytics' },
+			{ href: '/forum', label: 'Forum' },
 		];
 	} else if (role === 'student') {
 		return [
 			{ href: '/dashboard/student', label: 'Dashboard' },
 			{ href: '/courses', label: 'My Courses' },
 			{ href: '/courses/explore', label: 'Explore Courses' },
+			{ href: '/recommendations', label: 'Recommendations' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
 			{ href: '/progress', label: 'Progress' },
