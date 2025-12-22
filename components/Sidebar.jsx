@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { auth, db } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { 
 	LayoutDashboard, 
 	UserPlus, 
@@ -22,7 +22,8 @@ import {
 	Users,
 	Settings,
 	Code,
-	Lightbulb
+	Lightbulb,
+	Brain
 } from 'lucide-react';
 
 const iconMap = {
@@ -40,46 +41,88 @@ const iconMap = {
 	'Forum': MessageSquare,
 	'Home': Home,
 	'Explore Courses': Search,
-	'Module Library': BookOpen,
 	'Profile': User,
 	'Sign In': null,
 	'Coding Help': Code,
 	'Explain Concept': Lightbulb,
+	'Recommendations': Brain,
 };
 
-export default function Sidebar({ role, navItems }) {
+export default function Sidebar({ role: initialRole, navItems: initialNavItems }) {
 	const pathname = usePathname();
+	const router = useRouter();
 	const [profilePicture, setProfilePicture] = useState(null);
 	const [userName, setUserName] = useState('');
+	const [currentRole, setCurrentRole] = useState(initialRole);
+	const [navItems, setNavItems] = useState(initialNavItems);
 
+	// Listen to auth state changes and refresh the page
 	useEffect(() => {
-		if (role === 'guest') {
-			setProfilePicture(null);
-			setUserName('');
-			return;
-		}
-
 		let unsubscribeAuth;
 		let unsubscribeFirestore;
 
-		unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+		unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
 			if (user) {
-				// Set up real-time listener for user profile changes
-				const userDocRef = doc(db, 'user', user.uid);
-				unsubscribeFirestore = onSnapshot(
-					userDocRef,
-					(snapshot) => {
-						if (snapshot.exists()) {
-							const userData = snapshot.data();
-							setProfilePicture(userData.profilePicture || null);
-							setUserName(userData.name || '');
-						}
-					},
-					(error) => {
-						console.error('Error listening to user profile:', error);
+				// Get user role from Firestore
+				try {
+					const userDocRef = doc(db, 'user', user.uid);
+					const userDoc = await getDoc(userDocRef);
+					
+					if (userDoc.exists()) {
+						const userData = userDoc.data();
+						const newRole = userData.role || 'student';
+						
+						// Update role if it changed (using functional update to avoid dependency)
+						setCurrentRole(prevRole => {
+							if (newRole !== prevRole) {
+								// Refresh server component to get updated nav items
+								router.refresh();
+								return newRole;
+							}
+							return prevRole;
+						});
+						
+						setProfilePicture(userData.profilePicture || null);
+						setUserName(userData.name || '');
 					}
-				);
+					
+					// Set up real-time listener for user profile changes
+					unsubscribeFirestore = onSnapshot(
+						userDocRef,
+						(snapshot) => {
+							if (snapshot.exists()) {
+								const userData = snapshot.data();
+								const newRole = userData.role || 'student';
+								
+								// Update role if it changed
+								setCurrentRole(prevRole => {
+									if (newRole !== prevRole) {
+										router.refresh();
+										return newRole;
+									}
+									return prevRole;
+								});
+								
+								setProfilePicture(userData.profilePicture || null);
+								setUserName(userData.name || '');
+							}
+						},
+						(error) => {
+							console.error('Error listening to user profile:', error);
+						}
+					);
+				} catch (error) {
+					console.error('Error fetching user data:', error);
+				}
 			} else {
+				// User signed out
+				setCurrentRole(prevRole => {
+					if (prevRole !== 'guest') {
+						router.refresh();
+						return 'guest';
+					}
+					return prevRole;
+				});
 				setProfilePicture(null);
 				setUserName('');
 				if (unsubscribeFirestore) {
@@ -92,7 +135,13 @@ export default function Sidebar({ role, navItems }) {
 			if (unsubscribeAuth) unsubscribeAuth();
 			if (unsubscribeFirestore) unsubscribeFirestore();
 		};
-	}, [role]);
+	}, [router]);
+
+	// Update nav items when role prop changes (from server refresh)
+	useEffect(() => {
+		setCurrentRole(initialRole);
+		setNavItems(initialNavItems);
+	}, [initialRole, initialNavItems]);
 
 	return (
 		<aside className="hidden md:flex w-52 flex-shrink-0 h-screen flex-col bg-white border-r border-border shadow-sm sticky top-0 z-50">
@@ -131,7 +180,7 @@ export default function Sidebar({ role, navItems }) {
 				
 				{/* Role Badge */}
 				<span className="inline-flex items-center px-3 py-1 rounded-lg text-caption font-medium bg-neutralLight text-neutralDark capitalize">
-					{role === 'guest' ? 'Guest' : role}
+					{currentRole === 'guest' ? 'Guest' : currentRole}
 				</span>
 			</div>
 			

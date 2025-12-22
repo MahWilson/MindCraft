@@ -53,7 +53,10 @@ export default function LoginPage() {
 				}),
 			});
 
-			// Step 4: Redirect based on role
+			// Step 4: Refresh to update server components (sidebar/header)
+			router.refresh();
+
+			// Step 5: Redirect based on role
 			if (role === 'admin') {
 				router.push('/dashboard/admin');
 			} else if (role === 'teacher') {
