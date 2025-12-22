@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { collection, query, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useParams, useRouter } from 'next/navigation';
+import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, query, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,8 +12,11 @@ import { ArrowLeft, Save, Loader2, Sparkles, Plus, X, Trash2 } from 'lucide-reac
 import Link from 'next/link';
 import RichTextEditor from '@/app/components/RichTextEditor';
 
-export default function CreateAssessmentPage() {
+export default function EditAssessmentPage() {
+	const params = useParams();
 	const router = useRouter();
+	const assessmentId = params.id;
+
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
 	const [courseId, setCourseId] = useState('');
@@ -23,10 +26,18 @@ export default function CreateAssessmentPage() {
 	const [courses, setCourses] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [submitting, setSubmitting] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	const [currentUserId, setCurrentUserId] = useState(null);
 	const [userRole, setUserRole] = useState(null);
+	const [error, setError] = useState('');
 	const [generating, setGenerating] = useState(false);
 	const [published, setPublished] = useState(false);
+	const [config, setConfig] = useState({
+		startDate: '',
+		endDate: '',
+		timer: '',
+		attempts: 1,
+	});
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -50,26 +61,93 @@ export default function CreateAssessmentPage() {
 	}, [router]);
 
 	useEffect(() => {
-		if (userRole === 'teacher' || userRole === 'admin') {
-			loadCourses();
+		if ((userRole === 'teacher' || userRole === 'admin') && currentUserId) {
+			loadData();
 		}
-	}, [userRole]);
+	}, [assessmentId, userRole, currentUserId]);
 
-	async function loadCourses() {
+	async function loadData() {
 		setLoading(true);
 		try {
+			// Load courses
 			const coursesQuery = query(collection(db, 'course'));
-			const snapshot = await getDocs(coursesQuery);
-			const loadedCourses = snapshot.docs.map(doc => ({
+			const coursesSnapshot = await getDocs(coursesQuery);
+			const loadedCourses = coursesSnapshot.docs.map(doc => ({
 				id: doc.id,
 				...doc.data(),
 			}));
 			setCourses(loadedCourses);
+
+			// Load assessment
+			const assessmentDoc = await getDoc(doc(db, 'assessment', assessmentId));
+			if (!assessmentDoc.exists()) {
+				setError('Assessment not found');
+				setLoading(false);
+				return;
+			}
+
+			const assessmentData = assessmentDoc.data();
+
+			// Check permissions
+			const currentUser = auth.currentUser;
+			if (currentUser && assessmentData.createdBy !== currentUser.uid && userRole !== 'admin') {
+				setError('You do not have permission to edit this assessment');
+				setLoading(false);
+				return;
+			}
+
+			setTitle(assessmentData.title || '');
+			setDescription(assessmentData.description || '');
+			setCourseId(assessmentData.courseId || '');
+			setCourseTitle(assessmentData.courseTitle || '');
+			setType(assessmentData.type || 'quiz');
+			setPublished(assessmentData.published || false);
+			
+			// Load questions
+			if (assessmentData.questions && Array.isArray(assessmentData.questions)) {
+				setQuestions(assessmentData.questions.map((q, idx) => ({
+					id: `question_${idx}_${Date.now()}`,
+					type: q.type || 'mcq',
+					question: q.question || '',
+					options: q.options || ['', '', '', ''],
+					correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+					points: q.points || 1,
+				})));
+			}
+
+			// Load config
+			if (assessmentData.config) {
+				const configData = assessmentData.config;
+				const startDate = configData.startDate 
+					? (configData.startDate.toDate ? configData.startDate.toDate() : new Date(configData.startDate))
+					: null;
+				const endDate = configData.endDate 
+					? (configData.endDate.toDate ? configData.endDate.toDate() : new Date(configData.endDate))
+					: null;
+
+				setConfig({
+					startDate: startDate ? formatDateForInput(startDate) : '',
+					endDate: endDate ? formatDateForInput(endDate) : '',
+					timer: configData.timer || '',
+					attempts: configData.attempts || 1,
+				});
+			}
 		} catch (err) {
-			console.error('Error loading courses:', err);
+			console.error('Error loading data:', err);
+			setError('Failed to load assessment');
 		} finally {
 			setLoading(false);
 		}
+	}
+
+	function formatDateForInput(date) {
+		const d = date instanceof Date ? date : new Date(date);
+		const year = d.getFullYear();
+		const month = String(d.getMonth() + 1).padStart(2, '0');
+		const day = String(d.getDate()).padStart(2, '0');
+		const hours = String(d.getHours()).padStart(2, '0');
+		const minutes = String(d.getMinutes()).padStart(2, '0');
+		return `${year}-${month}-${day}T${hours}:${minutes}`;
 	}
 
 	function handleCourseChange(e) {
@@ -229,13 +307,17 @@ export default function CreateAssessmentPage() {
 
 		try {
 			if (!auth.currentUser) {
-				throw new Error('You must be signed in to create assessments');
+				throw new Error('You must be signed in to update assessments');
 			}
 
 			// Helper function to remove undefined values
 			const removeUndefined = (obj) => {
+				if (obj === null || typeof obj !== 'object') return obj;
+				if (Array.isArray(obj)) return obj.map(removeUndefined);
 				return Object.fromEntries(
-					Object.entries(obj).filter(([_, value]) => value !== undefined)
+					Object.entries(obj)
+						.map(([key, value]) => [key, removeUndefined(value)])
+						.filter(([_, value]) => value !== undefined)
 				);
 			};
 
@@ -259,19 +341,40 @@ export default function CreateAssessmentPage() {
 					return questionData;
 				}),
 				published,
-				createdBy: auth.currentUser.uid,
-				createdAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
+				config: {
+					startDate: config.startDate ? new Date(config.startDate) : null,
+					endDate: config.endDate ? new Date(config.endDate) : null,
+					timer: config.timer ? parseInt(config.timer) : null,
+					attempts: config.attempts ? parseInt(config.attempts) : null,
+				},
 			});
 
-			await addDoc(collection(db, 'assessment'), assessmentData);
+			await updateDoc(doc(db, 'assessment', assessmentId), assessmentData);
 
 			router.push('/assessments');
 		} catch (err) {
-			console.error('Error creating assessment:', err);
-			alert('Failed to create assessment: ' + (err.message || 'Unknown error'));
+			console.error('Error updating assessment:', err);
+			alert('Failed to update assessment: ' + (err.message || 'Unknown error'));
 		} finally {
 			setSubmitting(false);
+		}
+	}
+
+	async function handleDelete() {
+		if (!confirm('Are you sure you want to delete this assessment? This action cannot be undone.')) {
+			return;
+		}
+
+		setDeleting(true);
+
+		try {
+			await deleteDoc(doc(db, 'assessment', assessmentId));
+			router.push('/assessments');
+		} catch (err) {
+			console.error('Error deleting assessment:', err);
+			alert('Failed to delete assessment: ' + (err.message || 'Unknown error'));
+			setDeleting(false);
 		}
 	}
 
@@ -279,9 +382,27 @@ export default function CreateAssessmentPage() {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Create Assessment</h1>
+					<h1 className="text-h1 text-neutralDark mb-2">Edit Assessment</h1>
 					<p className="text-body text-muted-foreground">Loading...</p>
 				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="space-y-8">
+				<Link href="/assessments">
+					<Button variant="ghost" className="mb-4" title="Back to Assessments">
+						<ArrowLeft className="h-4 w-4 mr-2" />
+						Back to Assessments
+					</Button>
+				</Link>
+				<Card>
+					<CardContent className="py-12 text-center">
+						<p className="text-body text-destructive">{error}</p>
+					</CardContent>
+				</Card>
 			</div>
 		);
 	}
@@ -290,7 +411,7 @@ export default function CreateAssessmentPage() {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Create Assessment</h1>
+					<h1 className="text-h1 text-neutralDark mb-2">Edit Assessment</h1>
 					<p className="text-body text-muted-foreground">Access denied.</p>
 				</div>
 			</div>
@@ -307,8 +428,8 @@ export default function CreateAssessmentPage() {
 						Back to Assessments
 					</Button>
 				</Link>
-				<h1 className="text-h1 text-neutralDark mb-2">Create Assessment</h1>
-				<p className="text-body text-muted-foreground">Create a new assessment with questions for your course</p>
+				<h1 className="text-h1 text-neutralDark mb-2">Edit Assessment</h1>
+				<p className="text-body text-muted-foreground">Update assessment details and questions</p>
 			</div>
 
 			<form onSubmit={handleSubmit}>
@@ -317,7 +438,7 @@ export default function CreateAssessmentPage() {
 					<Card>
 						<CardHeader>
 							<CardTitle>Basic Information</CardTitle>
-							<CardDescription>Enter the assessment details</CardDescription>
+							<CardDescription>Update the assessment details</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div>
@@ -414,7 +535,7 @@ export default function CreateAssessmentPage() {
 							<div className="flex items-center justify-between">
 								<div>
 									<CardTitle>Questions</CardTitle>
-									<CardDescription>Add questions to your assessment</CardDescription>
+									<CardDescription>Update questions for your assessment</CardDescription>
 								</div>
 								<Button
 									type="button"
@@ -575,8 +696,57 @@ export default function CreateAssessmentPage() {
 									className="w-5 h-5"
 								/>
 								<label htmlFor="published" className="text-sm font-medium cursor-pointer">
-									Publish immediately (visible to students)
+									Publish (visible to students)
 								</label>
+							</div>
+
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label htmlFor="startDate" className="block text-sm font-medium mb-2">
+										Start Date
+									</label>
+									<Input
+										id="startDate"
+										type="datetime-local"
+										value={config.startDate}
+										onChange={(e) => setConfig({ ...config, startDate: e.target.value })}
+									/>
+								</div>
+								<div>
+									<label htmlFor="endDate" className="block text-sm font-medium mb-2">
+										End Date
+									</label>
+									<Input
+										id="endDate"
+										type="datetime-local"
+										value={config.endDate}
+										onChange={(e) => setConfig({ ...config, endDate: e.target.value })}
+									/>
+								</div>
+								<div>
+									<label htmlFor="timer" className="block text-sm font-medium mb-2">
+										Timer (minutes)
+									</label>
+									<Input
+										id="timer"
+										type="number"
+										value={config.timer}
+										onChange={(e) => setConfig({ ...config, timer: e.target.value })}
+										placeholder="e.g., 60"
+									/>
+								</div>
+								<div>
+									<label htmlFor="attempts" className="block text-sm font-medium mb-2">
+										Max Attempts
+									</label>
+									<Input
+										id="attempts"
+										type="number"
+										value={config.attempts}
+										onChange={(e) => setConfig({ ...config, attempts: parseInt(e.target.value) || 1 })}
+										min="1"
+									/>
+								</div>
 							</div>
 						</CardContent>
 					</Card>
@@ -586,17 +756,37 @@ export default function CreateAssessmentPage() {
 						<Button
 							type="submit"
 							disabled={submitting}
-							title="Create Assessment"
+							title="Save Changes"
 						>
 							{submitting ? (
 								<>
 									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
-									Creating...
+									Saving...
 								</>
 							) : (
 								<>
 									<Save className="h-5 w-5 mr-2" />
-									Create Assessment
+									Save Changes
+								</>
+							)}
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={handleDelete}
+							disabled={deleting}
+							className="text-destructive hover:text-destructive"
+							title="Delete Assessment"
+						>
+							{deleting ? (
+								<>
+									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+									Deleting...
+								</>
+							) : (
+								<>
+									<Trash2 className="h-5 w-5 mr-2" />
+									Delete
 								</>
 							)}
 						</Button>
@@ -611,4 +801,3 @@ export default function CreateAssessmentPage() {
 		</div>
 	);
 }
-

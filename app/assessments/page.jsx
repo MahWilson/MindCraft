@@ -49,13 +49,13 @@ export default function AssessmentsPage() {
 	}, [router]);
 
 	useEffect(() => {
-		if (userRole) {
+		if (userRole && currentUserId) {
 			loadAssessments();
 			if (userRole === 'student') {
 				loadSubmissions();
 			}
 		}
-	}, [userRole]);
+	}, [userRole, currentUserId]);
 
 	// Prevent body scroll when modals are open
 	useEffect(() => {
@@ -83,9 +83,35 @@ export default function AssessmentsPage() {
 		setLoading(true);
 		try {
 			let assessmentsQuery;
+			let enrolledCourseIds = [];
 			
 			if (userRole === 'student') {
-				// Students see only published assessments
+				// First, get all courses the student is enrolled in
+				if (!currentUserId) {
+					console.log('loadAssessments: currentUserId not available yet');
+					setLoading(false);
+					return;
+				}
+
+				try {
+					const enrollmentsQuery = query(
+						collection(db, 'enrollment'),
+						where('studentId', '==', currentUserId)
+					);
+					const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+					enrolledCourseIds = enrollmentsSnapshot.docs.map(doc => {
+						const data = doc.data();
+						return data.courseId;
+					}).filter(Boolean); // Remove any undefined/null values
+					
+					console.log('loadAssessments: Enrolled course IDs:', enrolledCourseIds);
+				} catch (enrollmentErr) {
+					console.error('Error loading enrollments:', enrollmentErr);
+					// Continue even if enrollment query fails, but show no assessments
+					enrolledCourseIds = [];
+				}
+
+				// Students see only published assessments for courses they're enrolled in
 				assessmentsQuery = query(
 					collection(db, 'assessment'),
 					where('published', '==', true),
@@ -99,15 +125,65 @@ export default function AssessmentsPage() {
 				);
 			}
 
-			const snapshot = await getDocs(assessmentsQuery);
-			const loadedAssessments = snapshot.docs.map(doc => ({
+			let snapshot;
+			try {
+				snapshot = await getDocs(assessmentsQuery);
+			} catch (queryErr) {
+				// If orderBy query fails (missing index), try without orderBy
+				if (queryErr.code === 'failed-precondition' || queryErr.message?.includes('index')) {
+					console.warn('OrderBy query failed (missing index), trying without orderBy:', queryErr);
+					const fallbackQuery = query(
+						collection(db, 'assessment'),
+						where('published', '==', true)
+					);
+					snapshot = await getDocs(fallbackQuery);
+				} else {
+					throw queryErr;
+				}
+			}
+
+			let loadedAssessments = snapshot.docs.map(doc => ({
 				id: doc.id,
 				...doc.data(),
 			}));
 
+			// Sort manually if we couldn't use orderBy
+			if (userRole !== 'student' || enrolledCourseIds.length > 0) {
+				loadedAssessments.sort((a, b) => {
+					const aTime = a.createdAt?.toDate?.() || a.createdAt || 0;
+					const bTime = b.createdAt?.toDate?.() || b.createdAt || 0;
+					return bTime - aTime;
+				});
+			}
+
+			console.log('loadAssessments: All published assessments:', loadedAssessments.map(a => ({
+				id: a.id,
+				title: a.title,
+				courseId: a.courseId
+			})));
+
+			// Filter assessments by enrollment for students
+			if (userRole === 'student') {
+				if (enrolledCourseIds.length > 0) {
+					loadedAssessments = loadedAssessments.filter(assessment => {
+						const matches = enrolledCourseIds.includes(assessment.courseId);
+						if (!matches && assessment.courseId) {
+							console.log(`Assessment "${assessment.title}" (courseId: ${assessment.courseId}) not in enrolled courses`);
+						}
+						return matches;
+					});
+					console.log('loadAssessments: Filtered assessments:', loadedAssessments.length);
+				} else {
+					// Student has no enrollments, show no assessments
+					console.log('loadAssessments: Student has no enrollments');
+					loadedAssessments = [];
+				}
+			}
+
 			setAssessments(loadedAssessments);
 		} catch (err) {
 			console.error('Error loading assessments:', err);
+			setAssessments([]);
 		} finally {
 			setLoading(false);
 		}
