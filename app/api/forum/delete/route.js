@@ -1,0 +1,34 @@
+import { NextResponse } from 'next/server'
+import { adminDb } from '@/lib/admin'
+
+export async function POST(request) {
+  try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Service Unavailable - Backend Config Missing' }, { status: 503 })
+    }
+
+    const { postId, userId, userRole, reason } = await request.json()
+    if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
+    const dataSnap = await adminDb.collection('post').doc(postId).get()
+    const data = dataSnap.exists ? dataSnap.data() : null
+    const isOwner = data && data.authorId === userId
+    const role = String(userRole || '').toLowerCase()
+    if (role !== 'teacher' && role !== 'admin' && !isOwner) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const ref = adminDb.collection('post').doc(postId)
+    const snap = await ref.get()
+    if (!snap.exists) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    await adminDb.collection('audit_log').add({
+      action: 'DELETE_POST',
+      postId,
+      deletedContent: snap.data(),
+      deletedBy: userId,
+      reason: reason || '',
+      timeStamp: new Date(),
+      replyId: ''
+    })
+    await ref.delete()
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
