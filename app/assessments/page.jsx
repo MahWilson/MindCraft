@@ -527,7 +527,6 @@ export default function AssessmentsPage() {
 
 									<div className="flex flex-wrap gap-2 pt-2 border-t">
 										{userRole === 'student' ? (
-<<<<<<< HEAD
 											assessment.type === 'assignment' ? (
 												<div className="w-full space-y-3">
 													{submissions[assessment.id] && (
@@ -537,20 +536,6 @@ export default function AssessmentsPage() {
 																{language === 'bm' ? 'Telah dihantar' : 'Already submitted'}
 															</p>
 														</div>
-=======
-											<Link href={`/assessments/${assessment.id}/submit`} className="flex-1 min-w-[100px]">
-												<Button variant="default" className="w-full" title="Submit Assignment">
-													{assessment.type === 'assignment' ? (
-														<>
-															<Upload className="h-5 w-5 mr-2" />
-															Submit
-														</>
-													) : (
-														<>
-															Take Assessment
-															<ArrowRight className="h-5 w-5 ml-2" />
-														</>
->>>>>>> feature/learning-recommendations-and-downloads
 													)}
 													{expandedAssessment === assessment.id ? (
 														<div className="space-y-3">
