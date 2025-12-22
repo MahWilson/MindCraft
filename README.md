@@ -35,6 +35,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - User registration
 - Course modules/lessons
 - Assessments
+- Progress tracking
 
  **In Progress:**
 
@@ -43,4 +44,3 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - AI features (Gemini API)
 - Discussion forum
 - Offline support
-- Progress tracking
