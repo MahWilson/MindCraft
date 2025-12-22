@@ -52,7 +52,6 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 		setLoading(true);
 		setError('');
 		try {
-<<<<<<< HEAD
 			// Use client-side Firestore to create enrollment (has auth context)
 			const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
 			const { db } = await import('@/firebase');
@@ -67,41 +66,7 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 				setIsEnrolled(true);
 				setLoading(false);
 				return;
-=======
-			// Enroll directly from client-side to use Firebase Auth context
-			// Verify course exists and is published
-			const courseRef = doc(db, 'course', course.id);
-			const courseDoc = await getDoc(courseRef);
-			
-			if (!courseDoc.exists()) {
-				throw new Error('Course not found');
->>>>>>> feature/learning-recommendations-and-downloads
 			}
-			
-			const courseData = courseDoc.data();
-			if (courseData.status !== 'published') {
-				throw new Error('Cannot enroll in unpublished course');
-			}
-			
-			// Check if already enrolled
-			const enrollmentRef = doc(db, 'enrollment', `${currentUserId}_${course.id}`);
-			const enrollmentDoc = await getDoc(enrollmentRef);
-			
-			if (enrollmentDoc.exists()) {
-				throw new Error('Already enrolled in this course');
-			}
-			
-			// Create enrollment (client-side with auth context)
-			await setDoc(enrollmentRef, {
-				studentId: currentUserId,
-				courseId: course.id,
-				enrolledAt: serverTimestamp(),
-				progress: {
-					completedModules: [],
-					completedLessons: [],
-					overallProgress: 0,
-				},
-			});
 
 			// Verify course is published
 			if (course.status !== 'published') {
@@ -126,20 +91,8 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 			// Redirect to course detail page
 			router.push(`/courses/${course.id}`);
 		} catch (err) {
-<<<<<<< HEAD
 			console.error('Enrollment error:', err);
 			setError(err.message || 'Failed to enroll. Please try again.');
-=======
-			console.error('Enrollment error details:', err);
-			console.error('Error code:', err.code);
-			console.error('Error message:', err.message);
-			// Show more specific error message
-			if (err.code === 'permission-denied') {
-				setError('Permission denied. Please check your Firestore security rules or ensure you are signed in as a student.');
-			} else {
-				setError(err.message || 'Failed to enroll');
-			}
->>>>>>> feature/learning-recommendations-and-downloads
 		} finally {
 			setLoading(false);
 		}
