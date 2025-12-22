@@ -153,15 +153,54 @@ export default function ForumPage() {
   }, [isComposerOpen]);
 
   useEffect(() => {
-    const q = query(collection(db, 'post'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const pinned = rows.filter((p) => !!p.isPinned);
-      const others = rows.filter((p) => !p.isPinned);
-      setPosts([...pinned, ...others]);
+    let unsub;
+    try {
+      // Try with orderBy first (requires index)
+      const q = query(collection(db, 'post'), orderBy('createdAt', 'desc'));
+      unsub = onSnapshot(
+        q,
+        (snap) => {
+          const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const pinned = rows.filter((p) => !!p.isPinned);
+          const others = rows.filter((p) => !p.isPinned);
+          setPosts([...pinned, ...others]);
+          setIsFetching(false);
+        },
+        (error) => {
+          console.error('Forum query error (with orderBy):', error);
+          // Fallback: query without orderBy and sort client-side
+          const fallbackQ = query(collection(db, 'post'));
+          const fallbackUnsub = onSnapshot(
+            fallbackQ,
+            (snap) => {
+              const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              // Sort client-side by createdAt
+              rows.sort((a, b) => {
+                const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+                const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+                return tb - ta;
+              });
+              const pinned = rows.filter((p) => !!p.isPinned);
+              const others = rows.filter((p) => !p.isPinned);
+              setPosts([...pinned, ...others]);
+              setIsFetching(false);
+            },
+            (fallbackError) => {
+              console.error('Forum query error (fallback):', fallbackError);
+              setPosts([]);
+              setIsFetching(false);
+            }
+          );
+          unsub = fallbackUnsub;
+        }
+      );
+    } catch (error) {
+      console.error('Forum setup error:', error);
       setIsFetching(false);
-    });
-    return () => unsub();
+    }
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   const fetchName = useCallback(async (uid) => {
