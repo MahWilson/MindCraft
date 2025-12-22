@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, CheckCircle, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, Loader2, Clock, Info } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TakeAssessmentPage() {
@@ -26,6 +26,8 @@ export default function TakeAssessmentPage() {
 	const [timeRemaining, setTimeRemaining] = useState(null);
 	const [attempts, setAttempts] = useState([]);
 	const [canAttempt, setCanAttempt] = useState(true);
+	const [confirmSubmitModal, setConfirmSubmitModal] = useState(null); // {title, message}
+	const [resultModal, setResultModal] = useState(null); // {title, message, isError}
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -69,6 +71,18 @@ export default function TakeAssessmentPage() {
 			};
 		}
 	}, [assessment, timeRemaining]);
+
+// Prevent body scroll when a modal is open
+useEffect(() => {
+	if (confirmSubmitModal || resultModal) {
+		document.body.style.overflow = 'hidden';
+	} else {
+		document.body.style.overflow = 'unset';
+	}
+	return () => {
+		document.body.style.overflow = 'unset';
+	};
+}, [confirmSubmitModal, resultModal]);
 
 	async function loadData() {
 		setLoading(true);
@@ -185,8 +199,7 @@ export default function TakeAssessmentPage() {
 		if (timerIntervalRef.current) {
 			clearInterval(timerIntervalRef.current);
 		}
-		alert('Time is up! Your assessment will be submitted automatically.');
-		await handleSubmit(true);
+	await handleSubmit(true);
 	}
 
 	async function handleSubmit(isAutoSubmit = false) {
@@ -195,15 +208,20 @@ export default function TakeAssessmentPage() {
 			if (assessment.questions) {
 				for (let i = 0; i < assessment.questions.length; i++) {
 					if (answers[i] === null || answers[i] === undefined || answers[i] === '') {
-						if (!confirm('You have unanswered questions. Are you sure you want to submit?')) {
-							return;
-						}
-						break;
+					setConfirmSubmitModal({
+						title: 'Submit assessment?',
+						message: 'You have unanswered questions. Submit anyway?',
+					});
+					return;
 					}
 				}
 			}
 		}
 
+	await performSubmission(isAutoSubmit);
+}
+
+async function performSubmission(isAutoSubmit = false) {
 		setSubmitting(true);
 		setError('');
 
@@ -252,14 +270,28 @@ export default function TakeAssessmentPage() {
 
 			await addDoc(collection(db, 'submission'), submissionData);
 
-			alert(`Assessment submitted successfully! Your score: ${score}/${totalPoints}`);
-			router.push('/assessments');
+	setResultModal({
+		title: 'Assessment submitted',
+		message: `Your score: ${score}/${totalPoints}${isAutoSubmit ? ' (submitted automatically)' : ''}`,
+		isError: false,
+	});
 		} catch (err) {
 			console.error('Error submitting assessment:', err);
-			setError('Failed to submit assessment: ' + (err.message || 'Unknown error'));
-			setSubmitting(false);
+	const msg = 'Failed to submit assessment: ' + (err.message || 'Unknown error');
+	setError(msg);
+	setResultModal({
+		title: 'Submission failed',
+		message: msg,
+		isError: true,
+	});
+	setSubmitting(false);
 		}
 	}
+
+function closeResultModal() {
+	setResultModal(null);
+	router.push('/assessments');
+}
 
 	if (loading) {
 		return (
@@ -318,6 +350,7 @@ export default function TakeAssessmentPage() {
 	}
 
 	return (
+		<>
 		<div className="space-y-8">
 			{/* Header */}
 			<div>
@@ -437,6 +470,76 @@ export default function TakeAssessmentPage() {
 				</Card>
 			)}
 		</div>
+		
+		{/* Confirm Submit Modal */}
+		{confirmSubmitModal && (
+			<div
+				className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+				onClick={(e) => {
+					if (e.target === e.currentTarget) setConfirmSubmitModal(null);
+				}}
+				onKeyDown={(e) => {
+					if (e.key === 'Escape') setConfirmSubmitModal(null);
+				}}
+				tabIndex={-1}
+			>
+				<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+					<CardHeader>
+						<CardTitle className="text-h3 flex items-center gap-2">
+							<Info className="h-5 w-5 text-warning" />
+							{confirmSubmitModal.title}
+						</CardTitle>
+						<CardDescription>{confirmSubmitModal.message}</CardDescription>
+					</CardHeader>
+					<CardContent className="flex gap-3 justify-end">
+						<Button variant="outline" onClick={() => setConfirmSubmitModal(null)}>
+							Cancel
+						</Button>
+						<Button
+							onClick={() => {
+								setConfirmSubmitModal(null);
+								performSubmission(false);
+							}}
+						>
+							Submit anyway
+						</Button>
+					</CardContent>
+				</Card>
+			</div>
+		)}
+
+		{/* Result Modal */}
+		{resultModal && (
+			<div
+				className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+				onClick={(e) => {
+					if (e.target === e.currentTarget) closeResultModal();
+				}}
+				onKeyDown={(e) => {
+					if (e.key === 'Escape') closeResultModal();
+				}}
+				tabIndex={-1}
+			>
+				<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+					<CardHeader>
+						<CardTitle className={`text-h3 flex items-center gap-2 ${resultModal.isError ? 'text-destructive' : 'text-success'}`}>
+							{resultModal.isError ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+							{resultModal.title}
+						</CardTitle>
+						<CardDescription>{resultModal.message}</CardDescription>
+					</CardHeader>
+					<CardContent className="flex justify-end">
+						<Button
+							variant={resultModal.isError ? 'destructive' : 'default'}
+							onClick={closeResultModal}
+						>
+							OK
+						</Button>
+					</CardContent>
+				</Card>
+			</div>
+		)}
+		</>
 	);
 }
 
