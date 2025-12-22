@@ -49,13 +49,13 @@ export default function AssessmentsPage() {
 	}, [router]);
 
 	useEffect(() => {
-		if (userRole && currentUserId) {
+		if (userRole) {
 			loadAssessments();
 			if (userRole === 'student') {
 				loadSubmissions();
 			}
 		}
-	}, [userRole, currentUserId]);
+	}, [userRole]);
 
 	// Prevent body scroll when modals are open
 	useEffect(() => {
@@ -85,59 +85,27 @@ export default function AssessmentsPage() {
 			let assessmentsQuery;
 			
 			if (userRole === 'student') {
-				// First, get all published assessments
-				// Note: We query without orderBy first to avoid index issues, then sort client-side
+				// Students see only published assessments
 				assessmentsQuery = query(
 					collection(db, 'assessment'),
-					where('published', '==', true)
+					where('published', '==', true),
+					orderBy('createdAt', 'desc')
 				);
-				
-				const snapshot = await getDocs(assessmentsQuery);
-				const allAssessments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				})).sort((a, b) => {
-					// Sort by createdAt if available, otherwise by id
-					const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-					const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-					return bTime - aTime;
-				});
-
-				// Then, filter by enrollment - only show assessments for courses the student is enrolled in
-				if (currentUserId) {
-					const enrollmentsQuery = query(
-						collection(db, 'enrollment'),
-						where('studentId', '==', currentUserId)
-					);
-					const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-					const enrolledCourseIds = new Set(
-						enrollmentsSnapshot.docs.map(doc => doc.data().courseId)
-					);
-
-					// Filter assessments to only those for enrolled courses
-					const filteredAssessments = allAssessments.filter(assessment => 
-						assessment.courseId && enrolledCourseIds.has(assessment.courseId)
-					);
-
-					setAssessments(filteredAssessments);
-				} else {
-					setAssessments([]);
-				}
 			} else {
 				// Teachers and admins see all assessments
 				assessmentsQuery = query(
 					collection(db, 'assessment'),
 					orderBy('createdAt', 'desc')
 				);
-
-				const snapshot = await getDocs(assessmentsQuery);
-				const loadedAssessments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				}));
-
-				setAssessments(loadedAssessments);
 			}
+
+			const snapshot = await getDocs(assessmentsQuery);
+			const loadedAssessments = snapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+
+			setAssessments(loadedAssessments);
 		} catch (err) {
 			console.error('Error loading assessments:', err);
 		} finally {
@@ -559,6 +527,7 @@ export default function AssessmentsPage() {
 
 									<div className="flex flex-wrap gap-2 pt-2 border-t">
 										{userRole === 'student' ? (
+<<<<<<< HEAD
 											assessment.type === 'assignment' ? (
 												<div className="w-full space-y-3">
 													{submissions[assessment.id] && (
@@ -568,6 +537,20 @@ export default function AssessmentsPage() {
 																{language === 'bm' ? 'Telah dihantar' : 'Already submitted'}
 															</p>
 														</div>
+=======
+											<Link href={`/assessments/${assessment.id}/submit`} className="flex-1 min-w-[100px]">
+												<Button variant="default" className="w-full" title="Submit Assignment">
+													{assessment.type === 'assignment' ? (
+														<>
+															<Upload className="h-5 w-5 mr-2" />
+															Submit
+														</>
+													) : (
+														<>
+															Take Assessment
+															<ArrowRight className="h-5 w-5 ml-2" />
+														</>
+>>>>>>> feature/learning-recommendations-and-downloads
 													)}
 													{expandedAssessment === assessment.id ? (
 														<div className="space-y-3">

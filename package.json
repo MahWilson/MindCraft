@@ -9,14 +9,19 @@
     "start": "next start",
     "lint": "next lint",
     "migrate:rename-collections": "node scripts/rename-collections.js",
-    "migrate:rename-collections:delete": "node scripts/rename-collections.js --delete-old"
+    "migrate:rename-collections:delete": "node scripts/rename-collections.js --delete-old",
+    "import:sample-data": "node scripts/import-sample-data.js",
+    "update:lesson-content": "node scripts/update-lesson-content.js"
   },
   "dependencies": {
     "@tremor/react": "^3.18.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
     "firebase": "^10.14.1",
     "firebase-admin": "^13.6.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
     "lucide-react": "^0.552.0",
     "next": "^14.2.0",
     "react": "^18.3.0",

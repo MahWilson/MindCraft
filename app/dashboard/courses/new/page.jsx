@@ -85,6 +85,8 @@ export default function NewCoursePage() {
 							title: module.title,
 							order: module.order || 0,
 							lessons: [],
+							courseId: newCourseId, // Module belongs to this course
+							createdBy: user.uid,
 							createdAt: serverTimestamp(),
 							updatedAt: serverTimestamp(),
 						};

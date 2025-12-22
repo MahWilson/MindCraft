@@ -29,21 +29,35 @@ export default function ExploreCoursesPage() {
 	useEffect(() => {
 		async function loadCourses() {
 			try {
-				// Only load published courses for exploration
-				const coursesQuery = query(
-					collection(db, 'course'),
-					where('status', '==', 'published'),
-					orderBy('createdAt', 'desc')
-				);
-
-				const snapshot = await getDocs(coursesQuery);
-				const coursesList = snapshot.docs.map(doc => ({
+				// Load all courses and filter client-side to avoid index issues
+				// This is more reliable than requiring a composite index
+				const allCoursesQuery = query(collection(db, 'course'));
+				const snapshot = await getDocs(allCoursesQuery);
+				
+				let coursesList = snapshot.docs.map(doc => ({
 					id: doc.id,
 					...doc.data()
 				}));
+				
+				// Filter for published courses only
+				coursesList = coursesList.filter(course => course.status === 'published');
+				
+				// Sort by createdAt (descending - newest first)
+				coursesList.sort((a, b) => {
+					const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 
+					              a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0;
+					const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 
+					              b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0;
+					return bTime - aTime; // Descending
+				});
+				
 				setCourses(coursesList);
 			} catch (err) {
 				console.error('Error loading courses:', err);
+				console.error('Error details:', {
+					code: err.code,
+					message: err.message
+				});
 			} finally {
 				setLoading(false);
 			}
