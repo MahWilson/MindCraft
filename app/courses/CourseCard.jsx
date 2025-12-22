@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, User, CheckCircle2 } from 'lucide-react';
@@ -25,11 +25,14 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 		async function checkEnrollment() {
 			if (isStudent && currentUserId && isPublished) {
 				try {
-					const response = await fetch(`/api/courses/${course.id}/enroll?studentId=${currentUserId}`);
-					const data = await response.json();
-					setIsEnrolled(data.enrolled || false);
+					// Check enrollment directly from Firestore (client-side)
+					const { getDoc } = await import('firebase/firestore');
+					const enrollmentRef = doc(db, 'enrollment', `${currentUserId}_${course.id}`);
+					const enrollmentDoc = await getDoc(enrollmentRef);
+					setIsEnrolled(enrollmentDoc.exists());
 				} catch (err) {
 					console.error('Error checking enrollment:', err);
+					setIsEnrolled(false);
 				} finally {
 					setCheckingEnrollment(false);
 				}
@@ -49,23 +52,53 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 		setLoading(true);
 		setError('');
 		try {
-			const response = await fetch(`/api/courses/${course.id}/enroll`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ studentId: currentUserId }),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || 'Failed to enroll');
+			// Enroll directly from client-side to use Firebase Auth context
+			// Verify course exists and is published
+			const courseRef = doc(db, 'course', course.id);
+			const courseDoc = await getDoc(courseRef);
+			
+			if (!courseDoc.exists()) {
+				throw new Error('Course not found');
 			}
+			
+			const courseData = courseDoc.data();
+			if (courseData.status !== 'published') {
+				throw new Error('Cannot enroll in unpublished course');
+			}
+			
+			// Check if already enrolled
+			const enrollmentRef = doc(db, 'enrollment', `${currentUserId}_${course.id}`);
+			const enrollmentDoc = await getDoc(enrollmentRef);
+			
+			if (enrollmentDoc.exists()) {
+				throw new Error('Already enrolled in this course');
+			}
+			
+			// Create enrollment (client-side with auth context)
+			await setDoc(enrollmentRef, {
+				studentId: currentUserId,
+				courseId: course.id,
+				enrolledAt: serverTimestamp(),
+				progress: {
+					completedModules: [],
+					completedLessons: [],
+					overallProgress: 0,
+				},
+			});
 
 			setIsEnrolled(true);
 			// Redirect to course detail page
 			router.push(`/courses/${course.id}`);
 		} catch (err) {
-			setError(err.message || 'Failed to enroll');
+			console.error('Enrollment error details:', err);
+			console.error('Error code:', err.code);
+			console.error('Error message:', err.message);
+			// Show more specific error message
+			if (err.code === 'permission-denied') {
+				setError('Permission denied. Please check your Firestore security rules or ensure you are signed in as a student.');
+			} else {
+				setError(err.message || 'Failed to enroll');
+			}
 		} finally {
 			setLoading(false);
 		}
