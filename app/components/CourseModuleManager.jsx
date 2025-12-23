@@ -8,8 +8,10 @@ import { Plus, Trash2, ChevronDown, ChevronUp, ExternalLink, BookOpen, Search } 
 import Link from 'next/link';
 import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
+import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function CourseModuleManager({ courseId, initialModules = [], onModulesChange }) {
+	const { language } = useLanguage();
 	const [modules, setModules] = useState([]);
 	const [expandedModules, setExpandedModules] = useState({});
 	const [newModuleTitle, setNewModuleTitle] = useState('');
@@ -17,6 +19,60 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 	const [showModuleLibrary, setShowModuleLibrary] = useState(false);
 	const [moduleLibrary, setModuleLibrary] = useState([]);
 	const [searchTerm, setSearchTerm] = useState('');
+
+	// Translations
+	const translations = {
+		en: {
+			modulesLessons: 'Modules & Lessons (Optional)',
+			canAddLater: 'You can add these later',
+			moduleTitlePlaceholder: "Module title (e.g., 'Introduction to Python')",
+			addNewModule: 'Add New Module',
+			browseLibrary: 'Browse Library',
+			hideLibrary: 'Hide Library',
+			moduleLibrary: 'Module Library',
+			addExistingModules: 'Add existing modules to this course',
+			searchModules: 'Search modules...',
+			noModulesFound: 'No modules found matching your search.',
+			noModulesAvailable: 'No modules available in library.',
+			lesson: 'lesson',
+			lessons: 'lessons',
+			manageLessons: 'Manage Lessons',
+			add: 'Add',
+			delete: 'Delete',
+			loading: 'Loading modules...',
+			noModulesYet: 'No modules yet. Add modules to structure your course content.',
+			saveCourseFirst: 'Please save the course first before adding existing modules',
+			removeConfirm: 'Remove this module from the course? (The module itself will not be deleted)',
+			addFailed: 'Failed to add module',
+			removeFailed: 'Failed to remove module',
+		},
+		bm: {
+			modulesLessons: 'Modul & Pelajaran (Pilihan)',
+			canAddLater: 'Anda boleh menambah ini kemudian',
+			moduleTitlePlaceholder: "Tajuk modul (cth., 'Pengenalan kepada Python')",
+			addNewModule: 'Tambah Modul Baru',
+			browseLibrary: 'Layari Perpustakaan',
+			hideLibrary: 'Sembunyikan Perpustakaan',
+			moduleLibrary: 'Perpustakaan Modul',
+			addExistingModules: 'Tambah modul sedia ada ke kursus ini',
+			searchModules: 'Cari modul...',
+			noModulesFound: 'Tiada modul ditemui yang sepadan dengan carian anda.',
+			noModulesAvailable: 'Tiada modul tersedia dalam perpustakaan.',
+			lesson: 'pelajaran',
+			lessons: 'pelajaran',
+			manageLessons: 'Urus Pelajaran',
+			add: 'Tambah',
+			delete: 'Padam',
+			loading: 'Memuatkan modul...',
+			noModulesYet: 'Tiada modul lagi. Tambah modul untuk menyusun kandungan kursus anda.',
+			saveCourseFirst: 'Sila simpan kursus terlebih dahulu sebelum menambah modul sedia ada',
+			removeConfirm: 'Buang modul ini dari kursus? (Modul itu sendiri tidak akan dipadam)',
+			addFailed: 'Gagal menambah modul',
+			removeFailed: 'Gagal membuang modul',
+		},
+	};
+
+	const t = translations[language] || translations.en;
 
 	useEffect(() => {
 		// Load existing modules if courseId is provided
@@ -202,7 +258,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 			setNewModuleTitle('');
 		} catch (err) {
 			console.error('Error adding module:', err);
-			alert(err.message || 'Failed to add module');
+			alert(err.message || t.addFailed);
 		} finally {
 			setLoading(false);
 		}
@@ -210,7 +266,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 
 	async function addExistingModule(moduleId) {
 		if (!courseId) {
-			alert('Please save the course first before adding existing modules');
+			alert(t.saveCourseFirst);
 			return;
 		}
 
@@ -233,14 +289,14 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 			setSearchTerm('');
 		} catch (err) {
 			console.error('Error adding existing module:', err);
-			alert(err.message || 'Failed to add module');
+			alert(err.message || t.addFailed);
 		} finally {
 			setLoading(false);
 		}
 	}
 
 	async function removeModule(moduleId) {
-		if (!confirm('Remove this module from the course? (The module itself will not be deleted)')) return;
+		if (!confirm(t.removeConfirm)) return;
 
 		setLoading(true);
 		try {
@@ -265,7 +321,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 			}
 		} catch (err) {
 			console.error('Error removing module:', err);
-			alert(err.message || 'Failed to remove module');
+			alert(err.message || t.removeFailed);
 		} finally {
 			setLoading(false);
 		}
@@ -290,14 +346,14 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 	);
 
 	if (loading && modules.length === 0) {
-		return <p className="text-body text-muted-foreground">Loading modules...</p>;
+		return <p className="text-body text-muted-foreground">{t.loading}</p>;
 	}
 
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
-				<h3 className="text-h3 text-neutralDark">Modules & Lessons (Optional)</h3>
-				<p className="text-caption text-muted-foreground">You can add these later</p>
+				<h3 className="text-h3 text-neutralDark">{t.modulesLessons}</h3>
+				<p className="text-caption text-muted-foreground">{t.canAddLater}</p>
 			</div>
 
 			{/* Add Module */}
@@ -305,7 +361,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 				<Input
 					value={newModuleTitle}
 					onChange={(e) => setNewModuleTitle(e.target.value)}
-					placeholder="Module title (e.g., 'Introduction to Python')"
+					placeholder={t.moduleTitlePlaceholder}
 					className="flex-1"
 					onKeyDown={(e) => {
 						if (e.key === 'Enter') {
@@ -320,7 +376,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 					title="Create a new module for this course"
 				>
 					<Plus className="h-5 w-5 mr-2" />
-					Add New Module
+					{t.addNewModule}
 				</Button>
 				{courseId && (
 					<Button 
@@ -330,7 +386,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 						title="Browse and add existing modules from the module library"
 					>
 						<Search className="h-5 w-5 mr-2" />
-						{showModuleLibrary ? 'Hide' : 'Browse'} Library
+						{showModuleLibrary ? t.hideLibrary : t.browseLibrary}
 					</Button>
 				)}
 			</div>
@@ -339,13 +395,13 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 			{showModuleLibrary && (
 				<Card className="border-primary/20">
 					<CardHeader>
-						<CardTitle className="text-h3">Module Library</CardTitle>
-						<CardDescription>Add existing modules to this course</CardDescription>
+						<CardTitle className="text-h3">{t.moduleLibrary}</CardTitle>
+						<CardDescription>{t.addExistingModules}</CardDescription>
 						<div className="mt-4">
 							<Input
 								value={searchTerm}
 								onChange={(e) => setSearchTerm(e.target.value)}
-								placeholder="Search modules..."
+								placeholder={t.searchModules}
 								className="w-full"
 							/>
 						</div>
@@ -353,7 +409,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 					<CardContent>
 						{filteredLibrary.length === 0 ? (
 							<p className="text-body text-muted-foreground text-center py-4">
-								{searchTerm ? 'No modules found matching your search.' : 'No modules available in library.'}
+								{searchTerm ? t.noModulesFound : t.noModulesAvailable}
 							</p>
 						) : (
 							<div className="space-y-2 max-h-64 overflow-y-auto">
@@ -365,7 +421,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 										<div className="flex-1 min-w-0">
 											<p className="text-body font-medium text-neutralDark">{module.title}</p>
 											<p className="text-caption text-muted-foreground">
-												{module.lessonCount || 0} {module.lessonCount === 1 ? 'lesson' : 'lessons'}
+												{module.lessonCount || 0} {module.lessonCount === 1 ? t.lesson : t.lessons}
 											</p>
 										</div>
 										<div className="flex items-center gap-2">
@@ -384,7 +440,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 												disabled={loading}
 												title="Add this module to the course"
 											>
-												Add
+												{t.add}
 											</Button>
 										</div>
 									</div>
@@ -408,7 +464,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 									<div className="flex-1 min-w-0">
 										<CardTitle className="text-h3">{module.title}</CardTitle>
 										<CardDescription>
-											{module.lessonCount || 0} {module.lessonCount === 1 ? 'lesson' : 'lessons'}
+											{module.lessonCount || 0} {module.lessonCount === 1 ? t.lesson : t.lessons}
 										</CardDescription>
 									</div>
 								</div>
@@ -421,7 +477,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 											title="Open module to add and manage lessons"
 										>
 											<ExternalLink className="h-5 w-5 mr-2 text-primary" />
-											Manage Lessons
+											{t.manageLessons}
 										</Button>
 									</Link>
 									<Button
@@ -433,7 +489,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 										title="Remove this module from the course (module will not be deleted)"
 									>
 										<Trash2 className="h-5 w-5 mr-2 fill-destructive text-destructive" />
-										Delete
+										{t.delete}
 									</Button>
 								</div>
 							</div>
@@ -446,7 +502,7 @@ export default function CourseModuleManager({ courseId, initialModules = [], onM
 				<Card>
 					<CardContent className="pt-6">
 						<p className="text-body text-muted-foreground text-center py-4">
-							No modules yet. Add modules to structure your course content.
+							{t.noModulesYet}
 						</p>
 					</CardContent>
 				</Card>

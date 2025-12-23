@@ -12,8 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, BookOpen, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function ModulesPage() {
+	const { language } = useLanguage();
 	const [modules, setModules] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +23,60 @@ export default function ModulesPage() {
 	const [creating, setCreating] = useState(false);
 	const [role, setRole] = useState(null);
 	const router = useRouter();
+
+	// Translations
+	const translations = {
+		en: {
+			pageTitle: 'Module Library',
+			pageDescription: 'Create and manage modules that can be shared across multiple courses',
+			createNewModule: 'Create New Module',
+			createDescription: 'Build a new module that can be added to any course',
+			moduleTitlePlaceholder: "Module title (e.g., 'Introduction to Python')",
+			createModule: 'Create Module',
+			searchPlaceholder: 'Search modules...',
+			allModules: 'All Modules',
+			module: 'module',
+			modules: 'modules',
+			lesson: 'lesson',
+			lessons: 'lessons',
+			created: 'Created',
+			recently: 'Recently',
+			manageLessons: 'Manage Lessons',
+			loading: 'Loading modules...',
+			noModulesFound: 'No modules found matching your search.',
+			noModulesYet: 'No modules in the library yet. Create your first module!',
+			deleteConfirm: 'Delete this module and all its lessons? This action cannot be undone.',
+			createError: 'You must be signed in to create a module',
+			createFailed: 'Failed to create module',
+			deleteFailed: 'Failed to delete module',
+		},
+		bm: {
+			pageTitle: 'Perpustakaan Modul',
+			pageDescription: 'Cipta dan urus modul yang boleh dikongsi merentas pelbagai kursus',
+			createNewModule: 'Cipta Modul Baru',
+			createDescription: 'Bina modul baharu yang boleh ditambah ke mana-mana kursus',
+			moduleTitlePlaceholder: "Tajuk modul (cth., 'Pengenalan kepada Python')",
+			createModule: 'Cipta Modul',
+			searchPlaceholder: 'Cari modul...',
+			allModules: 'Semua Modul',
+			module: 'modul',
+			modules: 'modul',
+			lesson: 'pelajaran',
+			lessons: 'pelajaran',
+			created: 'Dicipta',
+			recently: 'Baru-baru ini',
+			manageLessons: 'Urus Pelajaran',
+			loading: 'Memuatkan modul...',
+			noModulesFound: 'Tiada modul ditemui yang sepadan dengan carian anda.',
+			noModulesYet: 'Tiada modul dalam perpustakaan lagi. Cipta modul pertama anda!',
+			deleteConfirm: 'Padam modul ini dan semua pelajarannya? Tindakan ini tidak boleh dibatalkan.',
+			createError: 'Anda mesti log masuk untuk mencipta modul',
+			createFailed: 'Gagal mencipta modul',
+			deleteFailed: 'Gagal memadam modul',
+		},
+	};
+
+	const t = translations[language] || translations.en;
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -154,7 +210,7 @@ export default function ModulesPage() {
 		try {
 			// Check authentication
 			if (!auth.currentUser) {
-				throw new Error('You must be signed in to create a module');
+				throw new Error(t.createError);
 			}
 
 			// Create module directly in Firestore (client-side with Firebase Auth)
@@ -175,14 +231,14 @@ export default function ModulesPage() {
 			setNewModuleTitle('');
 		} catch (err) {
 			console.error('Error creating module:', err);
-			alert(err.message || 'Failed to create module');
+			alert(err.message || t.createFailed);
 		} finally {
 			setCreating(false);
 		}
 	}
 
 	async function deleteModule(moduleId) {
-		if (!confirm('Delete this module and all its lessons? This action cannot be undone.')) return;
+		if (!confirm(t.deleteConfirm)) return;
 
 		setLoading(true);
 		try {
@@ -199,7 +255,7 @@ export default function ModulesPage() {
 			await loadModules();
 		} catch (err) {
 			console.error('Error deleting module:', err);
-			alert(err.message || 'Failed to delete module');
+			alert(err.message || t.deleteFailed);
 		} finally {
 			setLoading(false);
 		}
@@ -212,7 +268,7 @@ export default function ModulesPage() {
 	if (loading && modules.length === 0) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
-				<p className="text-body text-muted-foreground">Loading modules...</p>
+				<p className="text-body text-muted-foreground">{t.loading}</p>
 			</div>
 		);
 	}
@@ -221,24 +277,24 @@ export default function ModulesPage() {
 		<div className="space-y-8">
 			{/* Header */}
 			<div>
-				<h1 className="text-h1 text-neutralDark mb-2">Module Library</h1>
+				<h1 className="text-h1 text-neutralDark mb-2">{t.pageTitle}</h1>
 				<p className="text-body text-muted-foreground">
-					Create and manage modules that can be shared across multiple courses
+					{t.pageDescription}
 				</p>
 			</div>
 
 			{/* Create New Module */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-h3">Create New Module</CardTitle>
-					<CardDescription>Build a new module that can be added to any course</CardDescription>
+					<CardTitle className="text-h3">{t.createNewModule}</CardTitle>
+					<CardDescription>{t.createDescription}</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<div className="flex gap-2">
 						<Input
 							value={newModuleTitle}
 							onChange={(e) => setNewModuleTitle(e.target.value)}
-							placeholder="Module title (e.g., 'Introduction to Python')"
+							placeholder={t.moduleTitlePlaceholder}
 							className="flex-1"
 							onKeyDown={(e) => {
 								if (e.key === 'Enter') {
@@ -249,7 +305,7 @@ export default function ModulesPage() {
 						/>
 						<Button onClick={createModule} disabled={creating || !newModuleTitle.trim()}>
 							<Plus className="h-4 w-4 mr-2" />
-							Create Module
+							{t.createModule}
 						</Button>
 					</div>
 				</CardContent>
@@ -262,7 +318,7 @@ export default function ModulesPage() {
 					type="text"
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
-					placeholder="Search modules..."
+					placeholder={t.searchPlaceholder}
 					className="pl-10"
 				/>
 			</div>
@@ -270,9 +326,9 @@ export default function ModulesPage() {
 			{/* Modules Grid */}
 			<div>
 				<div className="flex items-center justify-between mb-4">
-					<h2 className="text-h2 text-neutralDark">All Modules</h2>
+					<h2 className="text-h2 text-neutralDark">{t.allModules}</h2>
 					<p className="text-body text-muted-foreground">
-						{filteredModules.length} {filteredModules.length === 1 ? 'module' : 'modules'}
+						{filteredModules.length} {filteredModules.length === 1 ? t.module : t.modules}
 					</p>
 				</div>
 
@@ -282,7 +338,7 @@ export default function ModulesPage() {
 							<div className="text-center py-8">
 								<BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
 								<p className="text-body text-muted-foreground">
-									{searchTerm ? 'No modules found matching your search.' : 'No modules in the library yet. Create your first module!'}
+									{searchTerm ? t.noModulesFound : t.noModulesYet}
 								</p>
 							</div>
 						</CardContent>
@@ -296,7 +352,7 @@ export default function ModulesPage() {
 										<div className="flex-1 min-w-0">
 											<CardTitle className="text-h3 mb-2 line-clamp-2">{module.title}</CardTitle>
 											<CardDescription>
-												{module.lessonCount || 0} {module.lessonCount === 1 ? 'lesson' : 'lessons'}
+												{module.lessonCount || 0} {module.lessonCount === 1 ? t.lesson : t.lessons}
 											</CardDescription>
 										</div>
 									</div>
@@ -305,9 +361,9 @@ export default function ModulesPage() {
 									<div className="flex items-center gap-2 text-caption text-muted-foreground">
 										<BookOpen className="h-4 w-4" />
 										<span>
-											Created {module.createdAt?.toDate ? 
+											{t.created} {module.createdAt?.toDate ? 
 												new Date(module.createdAt.toDate()).toLocaleDateString() : 
-												'Recently'}
+												t.recently}
 										</span>
 									</div>
 
@@ -315,7 +371,7 @@ export default function ModulesPage() {
 										<Link href={`/dashboard/modules/${module.id}`} className="flex-1">
 											<Button variant="default" className="w-full">
 												<ExternalLink className="h-4 w-4 mr-2" />
-												Manage Lessons
+												{t.manageLessons}
 											</Button>
 										</Link>
 										<Button
