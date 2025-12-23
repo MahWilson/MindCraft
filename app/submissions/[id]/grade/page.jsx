@@ -346,9 +346,33 @@ export default function GradeSubmissionPage() {
 							</span>
 						</div>
 					)}
+					{submission?.submittedAt && assignment?.deadline && (
+						<div className="flex items-center gap-2">
+							{(() => {
+								const submitDate = submission.submittedAt.toDate ? submission.submittedAt.toDate() : new Date(submission.submittedAt);
+								const deadlineDate = assignment.deadline.toDate ? assignment.deadline.toDate() : new Date(assignment.deadline);
+								const isLate = submitDate > deadlineDate;
+								return isLate ? (
+									<>
+										<AlertTriangle className="h-5 w-5 text-warning" />
+										<span className="text-sm text-warning">
+											<strong>{language === 'bm' ? 'Status:' : 'Status:'}</strong> {language === 'bm' ? 'Lewat' : 'Late Submission'}
+										</span>
+									</>
+								) : (
+									<>
+										<CheckCircle2 className="h-5 w-5 text-success" />
+										<span className="text-sm text-success">
+											<strong>{language === 'bm' ? 'Status:' : 'Status:'}</strong> {language === 'bm' ? 'Tepat Masa' : 'On Time'}
+										</span>
+									</>
+								);
+							})()}
+						</div>
+					)}
 					{isReleased && (
 						<div className="flex items-center gap-2">
-							<Clock className="h-5 w-5 text-success" />
+							<CheckCircle2 className="h-5 w-5 text-success" />
 							<span className="text-sm text-success">
 								<strong>{language === 'bm' ? 'Status:' : 'Status:'}</strong> {language === 'bm' ? 'Telah dilepaskan' : 'Released'}
 							</span>
