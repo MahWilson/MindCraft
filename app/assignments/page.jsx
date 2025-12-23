@@ -7,7 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { FileText, Plus, Edit2, Trash2, Calendar, Clock, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ClipboardCheck, Upload, ArrowRight } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, Calendar, Clock, Eye, EyeOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AssignmentsPage() {
@@ -37,83 +37,29 @@ export default function AssignmentsPage() {
 	}, [router]);
 
 	useEffect(() => {
-		if (userRole) {
+		if (userRole && (userRole === 'teacher' || userRole === 'admin')) {
 			loadAssignments();
+		} else if (userRole && userRole === 'student') {
+			// Students should be redirected or see a different view
+			router.push('/dashboard/student');
 		}
-	}, [userRole, currentUserId]);
+	}, [userRole, router]);
 
 	async function loadAssignments() {
 		setLoading(true);
 		try {
-			if (userRole === 'teacher' || userRole === 'admin') {
-				// Teachers and admins see all assignments
-				const assignmentsQuery = query(
-					collection(db, 'assignment'),
-					orderBy('createdAt', 'desc')
-				);
+			const assignmentsQuery = query(
+				collection(db, 'assignment'),
+				orderBy('createdAt', 'desc')
+			);
 
-				const snapshot = await getDocs(assignmentsQuery);
-				const loadedAssignments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				}));
+			const snapshot = await getDocs(assignmentsQuery);
+			const loadedAssignments = snapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}));
 
-				setAssignments(loadedAssignments);
-			} else if (userRole === 'student' && currentUserId) {
-				// Students see only published and open assignments for their enrolled courses
-				// First, get all published and open assignments
-				const assignmentsQuery = query(
-					collection(db, 'assignment'),
-					where('status', '==', 'published'),
-					where('isOpen', '==', true)
-				);
-
-				const snapshot = await getDocs(assignmentsQuery);
-				const allAssignments = snapshot.docs.map(doc => ({
-					id: doc.id,
-					...doc.data(),
-				}));
-
-				// Get student's enrollments
-				const enrollmentsQuery = query(
-					collection(db, 'enrollment'),
-					where('studentId', '==', currentUserId)
-				);
-				const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-				const enrolledCourseIds = new Set(
-					enrollmentsSnapshot.docs.map(doc => doc.data().courseId)
-				);
-
-				// Filter assignments to only those for enrolled courses
-				const filteredAssignments = allAssignments.filter(assignment => 
-					assignment.courseId && enrolledCourseIds.has(assignment.courseId)
-				);
-
-				// Check submission status for each assignment
-				const assignmentsWithStatus = await Promise.all(
-					filteredAssignments.map(async (assignment) => {
-						const submissionsQuery = query(
-							collection(db, 'submission'),
-							where('assignmentId', '==', assignment.id),
-							where('studentId', '==', currentUserId)
-						);
-						const submissionsSnapshot = await getDocs(submissionsQuery);
-						const hasSubmission = !submissionsSnapshot.empty;
-						const submission = hasSubmission ? {
-							id: submissionsSnapshot.docs[0].id,
-							...submissionsSnapshot.docs[0].data(),
-						} : null;
-
-						return {
-							...assignment,
-							hasSubmission,
-							submission,
-						};
-					})
-				);
-
-				setAssignments(assignmentsWithStatus);
-			}
+			setAssignments(loadedAssignments);
 		} catch (err) {
 			console.error('Error loading assignments:', err);
 		} finally {
@@ -198,12 +144,12 @@ export default function AssignmentsPage() {
 		);
 	}
 
-	if (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'student') {
+	if (userRole !== 'teacher' && userRole !== 'admin') {
 		return (
 			<div className="space-y-8">
 				<div>
 					<h1 className="text-h1 text-neutralDark mb-2">Assignments</h1>
-					<p className="text-body text-muted-foreground">Access denied.</p>
+					<p className="text-body text-muted-foreground">Access denied. Only teachers and admins can manage assignments.</p>
 				</div>
 			</div>
 		);
@@ -215,20 +161,14 @@ export default function AssignmentsPage() {
 			<div className="flex justify-between items-center">
 				<div>
 					<h1 className="text-h1 text-neutralDark mb-2">Assignments</h1>
-					<p className="text-body text-muted-foreground">
-						{userRole === 'student' 
-							? 'View and submit your assignments' 
-							: 'Create and manage assignments for your courses'}
-					</p>
+					<p className="text-body text-muted-foreground">Create and manage assignments for your courses</p>
 				</div>
-				{(userRole === 'teacher' || userRole === 'admin') && (
-					<Link href="/assignments/new">
-						<Button>
-							<Plus className="h-4 w-4 mr-2" />
-							Create Assignment
-						</Button>
-					</Link>
-				)}
+				<Link href="/assignments/new">
+					<Button>
+						<Plus className="h-4 w-4 mr-2" />
+						Create Assignment
+					</Button>
+				</Link>
 			</div>
 
 			{/* Assignments List */}
@@ -309,106 +249,64 @@ export default function AssignmentsPage() {
 									)}
 
 									<div className="flex flex-wrap gap-2 pt-2 border-t">
-										{userRole === 'student' ? (
-											<Link href={`/assignments/${assignment.id}/submit`} className="flex-1 min-w-[100px]">
-												<Button 
-													variant={assignment.hasSubmission ? "outline" : "default"} 
-													className="w-full" 
-													size="sm" 
-													title={assignment.hasSubmission ? "Update Submission" : "Submit Assignment"}
-												>
-													{assignment.hasSubmission ? (
-														<>
-															<Upload className="h-5 w-5 mr-2" />
-															Update Submission
-														</>
-													) : (
-														<>
-															<Upload className="h-5 w-5 mr-2" />
-															Submit
-															<ArrowRight className="h-5 w-5 ml-2" />
-														</>
-													)}
-												</Button>
-											</Link>
-										) : (
-											<>
-												<Link href={`/assignments/${assignment.id}/submissions`} className="flex-1 min-w-[100px]">
-													<Button variant="outline" className="w-full border-secondary/20 hover:bg-secondary/10 hover:border-secondary/40" size="sm" title="View Submissions">
-														<ClipboardCheck className="h-5 w-5 mr-2 text-secondary" />
-														Submissions
-													</Button>
-												</Link>
-												<Link href={`/assignments/${assignment.id}/edit`} className="flex-1 min-w-[100px]">
-													<Button variant="outline" className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/40" size="sm" title="Edit Assignment">
-														<Edit2 className="h-5 w-5 mr-2 text-primary" />
-														Edit
-													</Button>
-												</Link>
-											</>
-										)}
-										{userRole !== 'student' && (
-											<>
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => togglePublish(assignment)}
-													title={assignment.status === 'published' ? 'Unpublish' : 'Publish'}
-													className={assignment.status === 'published' 
-														? "border-warning/20 hover:bg-warning/10 hover:border-warning/40" 
-														: "border-success/20 hover:bg-success/10 hover:border-success/40"}
-												>
-													{assignment.status === 'published' ? (
-														<>
-															<EyeOff className="h-5 w-5 mr-2 text-warning" />
-															Unpublish
-														</>
-													) : (
-														<>
-															<Eye className="h-5 w-5 mr-2 text-success" />
-															Publish
-														</>
-													)}
-												</Button>
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => toggleOpen(assignment)}
-													title={assignment.isOpen ? 'Close Assignment' : 'Open Assignment'}
-													className={assignment.isOpen 
-														? "border-2 border-destructive/60 hover:bg-destructive/10 hover:border-destructive text-destructive hover:text-destructive" 
-														: "border-info/20 hover:bg-info/10 hover:border-info/40"}
-												>
-													{assignment.isOpen ? (
-														<>
-															<XCircle className="h-5 w-5 mr-2 fill-destructive text-destructive" />
-															Close
-														</>
-													) : (
-														<>
-															<CheckCircle className="h-5 w-5 mr-2 text-info" />
-															Open
-														</>
-													)}
-												</Button>
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => handleDelete(assignment.id)}
-													title="Delete Assignment"
-													className="border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40 text-destructive hover:text-destructive"
-												>
-													<Trash2 className="h-5 w-5 mr-2 fill-destructive text-destructive" />
-													Delete
-												</Button>
-											</>
-										)}
-										{userRole === 'student' && assignment.hasSubmission && (
-											<div className="flex items-center gap-2 text-sm text-muted-foreground">
-												<CheckCircle className="h-4 w-4 text-success" />
-												Submitted
-											</div>
-										)}
+										<Link href={`/assignments/${assignment.id}/edit`} className="flex-1 min-w-[100px]">
+											<Button variant="outline" className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/40" size="sm" title="Edit Assignment">
+												<Edit2 className="h-5 w-5 mr-2 text-primary" />
+												Edit
+											</Button>
+										</Link>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => togglePublish(assignment)}
+											title={assignment.status === 'published' ? 'Unpublish' : 'Publish'}
+											className={assignment.status === 'published' 
+												? "border-warning/20 hover:bg-warning/10 hover:border-warning/40" 
+												: "border-success/20 hover:bg-success/10 hover:border-success/40"}
+										>
+											{assignment.status === 'published' ? (
+												<>
+													<EyeOff className="h-5 w-5 mr-2 text-warning" />
+													Unpublish
+												</>
+											) : (
+												<>
+													<Eye className="h-5 w-5 mr-2 text-success" />
+													Publish
+												</>
+											)}
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => toggleOpen(assignment)}
+											title={assignment.isOpen ? 'Close Assignment' : 'Open Assignment'}
+											className={assignment.isOpen 
+												? "border-2 border-destructive/60 hover:bg-destructive/10 hover:border-destructive text-destructive hover:text-destructive" 
+												: "border-info/20 hover:bg-info/10 hover:border-info/40"}
+										>
+											{assignment.isOpen ? (
+												<>
+													<XCircle className="h-5 w-5 mr-2 fill-destructive text-destructive" />
+													Close
+												</>
+											) : (
+												<>
+													<CheckCircle className="h-5 w-5 mr-2 text-info" />
+													Open
+												</>
+											)}
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => handleDelete(assignment.id)}
+											title="Delete Assignment"
+											className="border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40 text-destructive hover:text-destructive"
+										>
+											<Trash2 className="h-5 w-5 mr-2 fill-destructive text-destructive" />
+											Delete
+										</Button>
 									</div>
 								</CardContent>
 							</Card>
