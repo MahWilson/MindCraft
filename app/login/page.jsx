@@ -57,15 +57,23 @@ export default function LoginPage() {
 			router.refresh();
 
 			// Step 5: Redirect based on role
+			let redirectPath;
 			if (role === 'admin') {
-				router.push('/dashboard/admin');
+				redirectPath = '/dashboard/admin';
 			} else if (role === 'teacher') {
-				router.push('/dashboard/teacher');
+				redirectPath = '/dashboard/teacher';
 			} else if (role === 'student') {
-				router.push('/dashboard/student');
+				redirectPath = '/dashboard/student';
 			} else {
-				router.push('/dashboard');
+				redirectPath = '/dashboard';
 			}
+			
+			// Redirect and then reload to ensure UI updates
+			router.push(redirectPath);
+			// Small delay to ensure navigation completes before reload
+			setTimeout(() => {
+				window.location.reload();
+			}, 100);
 		} catch (err) {
 			// Firebase Auth errors
 			if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {

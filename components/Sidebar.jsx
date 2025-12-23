@@ -147,7 +147,15 @@ export default function Sidebar({ role: initialRole, navItems: initialNavItems }
 		<aside className="hidden md:flex w-52 flex-shrink-0 h-screen flex-col bg-white border-r border-border shadow-sm sticky top-0 z-50">
 			{/* Logo/Brand */}
 			<Link 
-				href="/" 
+				href={
+					currentRole === 'guest'
+						? '/'
+						: currentRole === 'admin'
+						? '/dashboard/admin'
+						: currentRole === 'teacher'
+						? '/dashboard/teacher'
+						: '/dashboard/student'
+				}
 				className="px-6 pt-6 pb-4 flex items-center justify-center hover:opacity-80 transition-opacity duration-200"
 			>
 				<div className="flex-shrink-0 rounded-full overflow-hidden border border-border/50 shadow-sm w-28 h-28">
@@ -165,17 +173,38 @@ export default function Sidebar({ role: initialRole, navItems: initialNavItems }
 			
 			{/* Profile Picture and Role Badge */}
 			<div className="px-6 pb-6 flex items-center gap-3">
-				{/* Profile Picture - Circular Container */}
-				{profilePicture ? (
-					<img
-						src={profilePicture}
-						alt={userName || 'Profile'}
-						className="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0"
-					/>
+				{/* Profile Picture - Circular Container - Clickable */}
+				{currentRole !== 'guest' ? (
+					<Link
+						href="/profile"
+						className="cursor-pointer hover:opacity-80 transition-opacity"
+					>
+						{profilePicture ? (
+							<img
+								src={profilePicture}
+								alt={userName || 'Profile'}
+								className="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0"
+							/>
+						) : (
+							<div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border flex-shrink-0">
+								<User className="h-5 w-5 text-primary" />
+							</div>
+						)}
+					</Link>
 				) : (
-					<div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border flex-shrink-0">
-						<User className="h-5 w-5 text-primary" />
-					</div>
+					<>
+						{profilePicture ? (
+							<img
+								src={profilePicture}
+								alt={userName || 'Profile'}
+								className="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0"
+							/>
+						) : (
+							<div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border flex-shrink-0">
+								<User className="h-5 w-5 text-primary" />
+							</div>
+						)}
+					</>
 				)}
 				
 				{/* Role Badge */}
