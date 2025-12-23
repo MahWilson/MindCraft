@@ -631,11 +631,58 @@ export default function AnalyticsPage() {
 				topicHeatmap: analyticsData.topicHeatmap,
 			};
 
+		// Export as JSON
 		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
 		a.download = `class-performance-${selectedCourseId}-${Date.now()}.json`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	function exportAsCSV() {
+		if (!selectedCourseId || !analyticsData) return;
+
+		// Prepare CSV data
+		const headers = [
+			language === 'bm' ? 'Nama Pelajar' : 'Student Name',
+			language === 'bm' ? 'Email' : 'Email',
+			language === 'bm' ? 'Kadar Penyiapan (%)' : 'Completion Rate (%)',
+			language === 'bm' ? 'Skor Purata (%)' : 'Average Score (%)',
+			language === 'bm' ? 'Pelajaran Selesai' : 'Lessons Completed',
+			language === 'bm' ? 'Modul Selesai' : 'Modules Completed',
+			language === 'bm' ? 'Tarikh Aktiviti Terakhir' : 'Last Activity Date',
+			language === 'bm' ? 'Tingkat Risiko' : 'Risk Level',
+			language === 'bm' ? 'Sebab Risiko' : 'Risk Reasons',
+		];
+
+		const rows = analyticsData.students.map(student => [
+			student.name || 'N/A',
+			student.email || 'N/A',
+			Math.round(student.completionRate),
+			Math.round(student.avgScore),
+			student.completedLessons || 0,
+			student.completedModules || 0,
+			student.lastActivity ? new Date(student.lastActivity).toLocaleDateString() : 'N/A',
+			student.riskLevel || 'low',
+			(student.riskReasons || []).join('; '),
+		]);
+
+		// Create CSV content
+		const csvContent = [
+			headers.join(','),
+			...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+		].join('\n');
+
+		// Download CSV
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `class-performance-${selectedCourseId}-${Date.now()}.csv`;
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
