@@ -8,8 +8,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, FileText, User, Calendar, CheckCircle, Clock, AlertCircle, Edit } from 'lucide-react';
+import { ArrowLeft, FileText, User, Calendar, CheckCircle, Clock, AlertCircle, Edit, Search, Filter } from 'lucide-react';
 import { useLanguage } from '@/app/contexts/LanguageContext';
+import { Input } from '@/components/ui/input';
 
 export default function AssignmentSubmissionsPage() {
 	const params = useParams();
@@ -19,9 +20,12 @@ export default function AssignmentSubmissionsPage() {
 
 	const [assignment, setAssignment] = useState(null);
 	const [submissions, setSubmissions] = useState([]);
+	const [filteredSubmissions, setFilteredSubmissions] = useState([]);
 	const [students, setStudents] = useState({});
 	const [loading, setLoading] = useState(true);
 	const [userRole, setUserRole] = useState(null);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'graded', 'released'
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -83,12 +87,43 @@ export default function AssignmentSubmissionsPage() {
 				}
 			}
 			setStudents(studentData);
+			setFilteredSubmissions(loadedSubmissions);
 		} catch (err) {
 			console.error('Error loading data:', err);
 		} finally {
 			setLoading(false);
 		}
 	}
+
+	// Filter submissions based on search and status
+	useEffect(() => {
+		let filtered = [...submissions];
+
+		// Filter by search query (student name or email)
+		if (searchQuery.trim()) {
+			const query = searchQuery.toLowerCase();
+			filtered = filtered.filter(sub => {
+				const student = students[sub.studentId];
+				const name = (student?.name || '').toLowerCase();
+				const email = (student?.email || '').toLowerCase();
+				return name.includes(query) || email.includes(query);
+			});
+		}
+
+		// Filter by status
+		if (statusFilter !== 'all') {
+			filtered = filtered.filter(sub => {
+				const isGraded = sub.grade !== undefined || sub.feedback;
+				const isReleased = sub.feedbackReleased;
+				if (statusFilter === 'pending') return !isGraded;
+				if (statusFilter === 'graded') return isGraded && !isReleased;
+				if (statusFilter === 'released') return isReleased;
+				return true;
+			});
+		}
+
+		setFilteredSubmissions(filtered);
+	}, [submissions, searchQuery, statusFilter, students]);
 
 	function formatDate(timestamp) {
 		if (!timestamp) return language === 'bm' ? 'Tiada' : 'N/A';
@@ -153,8 +188,48 @@ export default function AssignmentSubmissionsPage() {
 				</p>
 			</div>
 
+			{/* Filters and Search */}
+			{submissions.length > 0 && (
+				<Card>
+					<CardContent className="pt-6">
+						<div className="flex flex-col md:flex-row gap-4">
+							<div className="flex-1 relative">
+								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+								<Input
+									type="text"
+									placeholder={language === 'bm' ? 'Cari pelajar...' : 'Search students...'}
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									className="pl-10"
+								/>
+							</div>
+							<div className="flex items-center gap-2">
+								<Filter className="h-4 w-4 text-muted-foreground" />
+								<select
+									value={statusFilter}
+									onChange={(e) => setStatusFilter(e.target.value)}
+									className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+								>
+									<option value="all">{language === 'bm' ? 'Semua Status' : 'All Status'}</option>
+									<option value="pending">{language === 'bm' ? 'Menunggu Gred' : 'Pending Grade'}</option>
+									<option value="graded">{language === 'bm' ? 'Sudah Digred' : 'Graded'}</option>
+									<option value="released">{language === 'bm' ? 'Telah Dilepaskan' : 'Released'}</option>
+								</select>
+							</div>
+						</div>
+						{filteredSubmissions.length !== submissions.length && (
+							<p className="text-sm text-muted-foreground mt-2">
+								{language === 'bm' 
+									? `Menunjukkan ${filteredSubmissions.length} daripada ${submissions.length} penyerahan`
+									: `Showing ${filteredSubmissions.length} of ${submissions.length} submissions`}
+							</p>
+						)}
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Submissions List */}
-			{submissions.length === 0 ? (
+			{filteredSubmissions.length === 0 ? (
 				<Card>
 					<CardContent className="py-12 text-center">
 						<FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -167,7 +242,7 @@ export default function AssignmentSubmissionsPage() {
 				</Card>
 			) : (
 				<div className="space-y-4">
-					{submissions.map((submission) => {
+					{filteredSubmissions.map((submission) => {
 						const student = students[submission.studentId];
 						const isGraded = submission.grade !== undefined || submission.feedback;
 						const isReleased = submission.feedbackReleased;
