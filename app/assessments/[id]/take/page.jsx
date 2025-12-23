@@ -8,8 +8,55 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, CheckCircle, AlertCircle, Loader2, Clock, Info } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, Loader2, Clock, Info, Play, RefreshCcw } from 'lucide-react';
 import Link from 'next/link';
+
+function withColor(blocks) {
+	const colorMap = {
+		select_table: 'bg-sky-200',
+		select_columns: 'bg-sky-200',
+		where_filter: 'bg-amber-200',
+		order_by: 'bg-purple-200',
+		limit: 'bg-emerald-200',
+		join: 'bg-blue-200',
+		group_by: 'bg-indigo-200',
+		having: 'bg-rose-200',
+		agg_sum: 'bg-green-200',
+		agg_avg: 'bg-green-200',
+		agg_count: 'bg-green-200',
+		insert: 'bg-orange-200',
+		update: 'bg-orange-200',
+		delete: 'bg-orange-200',
+		commit: 'bg-gray-200',
+		explain: 'bg-yellow-200',
+		add_index: 'bg-yellow-100',
+		drop_index: 'bg-yellow-100',
+		create_table: 'bg-pink-100',
+		add_column: 'bg-pink-100',
+		primary_key: 'bg-pink-100',
+		foreign_key: 'bg-pink-100',
+		custom: 'bg-neutral-200',
+	};
+	return blocks.map(b => ({ ...b, color: colorMap[b.type] || 'bg-neutral-200' }));
+}
+
+function shuffleBlocks(blocks) {
+	const arr = [...blocks];
+	for (let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[arr[i], arr[j]] = [arr[j], arr[i]];
+	}
+	return arr;
+}
+
+function makeBlock(block) {
+	return {
+		id: crypto.randomUUID ? crypto.randomUUID() : `b_${Date.now()}_${Math.random()}`,
+		type: block.type,
+		label: block.label,
+		color: block.color,
+	};
+}
 
 export default function TakeAssessmentPage() {
 	const params = useParams();
@@ -26,8 +73,14 @@ export default function TakeAssessmentPage() {
 	const [timeRemaining, setTimeRemaining] = useState(null);
 	const [attempts, setAttempts] = useState([]);
 	const [canAttempt, setCanAttempt] = useState(true);
+	// Modals for regular assessments
 	const [confirmSubmitModal, setConfirmSubmitModal] = useState(null); // {title, message}
 	const [resultModal, setResultModal] = useState(null); // {title, message, isError}
+	// State for game-level assessments
+	const [gameBlocks, setGameBlocks] = useState([]);
+	const [gameMessage, setGameMessage] = useState('');
+	const [gameResult, setGameResult] = useState(null);
+	const [gamePalette, setGamePalette] = useState([]);
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -167,12 +220,18 @@ useEffect(() => {
 			}
 
 			// Initialize answers
-			if (assessmentData.questions) {
+			if (assessmentData.type !== 'gameLevel' && assessmentData.questions) {
 				const initialAnswers = {};
 				assessmentData.questions.forEach((q, idx) => {
 					initialAnswers[idx] = q.type === 'mcq' ? null : '';
 				});
 				setAnswers(initialAnswers);
+			}
+			if (assessmentData.type === 'gameLevel') {
+				setGameBlocks([]);
+				const seq = assessmentData.gameLevel?.blockSequence || [];
+				const palette = shuffleBlocks(withColor(seq));
+				setGamePalette(palette);
 			}
 		} catch (err) {
 			console.error('Error loading data:', err);
@@ -195,6 +254,70 @@ useEffect(() => {
 		}));
 	}
 
+	function handleGameDragStart(event, block) {
+		event.dataTransfer.setData('text/plain', JSON.stringify(block));
+	}
+
+	function handleGameDrop(event) {
+		event.preventDefault();
+		const data = event.dataTransfer.getData('text/plain');
+		if (!data) return;
+		let block;
+		try {
+			block = JSON.parse(data);
+		} catch (err) {
+			console.error('Bad drag data', err);
+			return;
+		}
+		setGameBlocks(prev => [...prev, makeBlock(block)]);
+	}
+
+	function handleGameDragOver(event) {
+		event.preventDefault();
+	}
+
+	function removeGameBlock(id) {
+		setGameBlocks(prev => prev.filter(b => b.id !== id));
+	}
+
+	function resetGameBlocks() {
+		setGameBlocks([]);
+		setGameResult(null);
+		setGameMessage('');
+	}
+
+	function evaluateGameBlocks(levelMeta, blocks) {
+		if (!blocks.length) {
+			return { ok: false, detail: 'Add some blocks first.' };
+		}
+
+		const types = blocks.map(b => b.type);
+		const required = levelMeta?.blockSequence || [];
+		if (required.length === 0) {
+			return { ok: false, detail: 'No expected sequence set by teacher.' };
+		}
+
+		const matchesLength = blocks.length === required.length;
+		const matchesOrder = matchesLength && required.every((req, i) => {
+			const student = blocks[i];
+			const sameType = student.type === req.type;
+			const sameLabel = (student.label || '').trim() === (req.label || '').trim();
+			return sameType && sameLabel;
+		});
+
+		return {
+			ok: matchesOrder,
+			detail: matchesOrder ? 'Sequence matches exactly.' : 'Sequence/order is incorrect.',
+		};
+	}
+
+	function runGameLevel() {
+		if (assessment?.type !== 'gameLevel') return;
+		const result = evaluateGameBlocks(assessment.gameLevel, gameBlocks);
+		setGameResult(result);
+		setGameMessage(result.ok ? 'Goal met! Submit to record.' : result.detail);
+	}
+
 	async function handleAutoSubmit() {
 		if (timerIntervalRef.current) {
 			clearInterval(timerIntervalRef.current);
@@ -204,8 +327,12 @@ useEffect(() => {
 
 	async function handleSubmit(isAutoSubmit = false) {
 		if (!isAutoSubmit) {
-			// Validate all questions are answered
-			if (assessment.questions) {
+			if (assessment.type === 'gameLevel') {
+				if (!gameResult?.ok) {
+					alert(gameMessage || 'Finish the blocks to meet the goal first.');
+					return;
+				}
+			} else if (assessment.questions) {
 				for (let i = 0; i < assessment.questions.length; i++) {
 					if (answers[i] === null || answers[i] === undefined || answers[i] === '') {
 					setConfirmSubmitModal({
@@ -230,12 +357,21 @@ async function performSubmission(isAutoSubmit = false) {
 				throw new Error('You must be signed in to submit');
 			}
 
-			// Calculate score
 			let score = 0;
 			let totalPoints = 0;
 			const gradedAnswers = {};
 
-			if (assessment.questions) {
+			if (assessment.type === 'gameLevel') {
+				score = 1;
+				totalPoints = 1;
+				gradedAnswers[0] = {
+					question: assessment.gameLevel?.goal || 'Game level',
+					studentAnswer: gameBlocks.map(b => b.type),
+					correctAnswer: 'Meets goal',
+					points: 1,
+					earned: 1,
+				};
+			} else if (assessment.questions) {
 				assessment.questions.forEach((question, idx) => {
 					totalPoints += question.points || 1;
 					const studentAnswer = answers[idx];
@@ -380,8 +516,141 @@ function closeResultModal() {
 				</div>
 			</div>
 
+			{/* Game Level */}
+			{assessment?.type === 'gameLevel' && (
+				<div className="grid gap-4 lg:grid-cols-[320px,1fr]">
+					<Card>
+						<CardHeader>
+							<CardTitle className="text-h4">Blocks</CardTitle>
+							<CardDescription>Drag to build the query logic.</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-2">
+							{gamePalette.length === 0 && (
+								<p className="text-caption text-muted-foreground">No blocks defined by teacher.</p>
+							)}
+							{gamePalette.map(block => (
+								<div
+									key={block.type}
+									draggable
+									onDragStart={(e) => handleGameDragStart(e, block)}
+									className={`cursor-grab rounded px-3 py-2 border text-sm ${block.color}`}
+								>
+									{block.label}
+								</div>
+							))}
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader className="flex flex-col gap-2">
+							<CardTitle className="text-h4">Workspace</CardTitle>
+							<p className="text-caption text-muted-foreground">
+								Drop blocks here then run to check the goal.
+							</p>
+							<div className="flex gap-2">
+								<Button size="sm" variant="secondary" onClick={runGameLevel}>
+									<Play className="h-4 w-4 mr-2" />
+									Run
+								</Button>
+								<Button size="sm" variant="outline" onClick={resetGameBlocks}>
+									<RefreshCcw className="h-4 w-4 mr-2" />
+									Clear
+								</Button>
+							</div>
+						</CardHeader>
+						<CardContent>
+							<div
+								onDragOver={handleGameDragOver}
+								onDrop={handleGameDrop}
+								className="min-h-[220px] border rounded p-3 bg-muted/40 space-y-2"
+							>
+								{gameBlocks.length === 0 && (
+									<p className="text-caption text-muted-foreground">Drag blocks here.</p>
+								)}
+								{gameBlocks.map(block => (
+									<div
+										key={block.id}
+										className="flex items-center justify-between gap-2 rounded border bg-white px-3 py-2"
+									>
+										<p className="text-body font-medium">{block.label}</p>
+										<button
+											type="button"
+											className="text-xs text-error"
+											onClick={() => removeGameBlock(block.id)}
+										>
+											remove
+										</button>
+									</div>
+								))}
+							</div>
+							<div className="mt-3 text-sm space-y-2">
+								<p className="font-semibold">Goal</p>
+								<p className="text-muted-foreground">
+									{assessment.gameLevel?.notes || 'Build the SQL logic to match the goal.'}
+								</p>
+								<div className="flex flex-col md:flex-row gap-3">
+									<div className="border rounded p-3 bg-white flex-1">
+										<p className="font-semibold text-body">Table A</p>
+										<p className="text-muted-foreground text-sm">{assessment.gameLevel?.tableA || 'tableA'}</p>
+										<div className="mt-2 space-y-2">
+											<p className="text-caption text-muted-foreground">Teacher selected columns</p>
+											{(() => {
+												const cols = (assessment.gameLevel?.columns || '')
+													.split(',')
+													.map(col => col.trim())
+													.filter(Boolean);
+
+												if (cols.length === 0) {
+													return <p className="text-caption text-muted-foreground">No columns defined.</p>;
+												}
+
+												return (
+													<div className="overflow-x-auto">
+														<table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+															<thead className="bg-muted/80">
+																<tr>
+																	{cols.map((col, idx) => (
+																		<th key={idx} className="px-2 py-2 text-left font-semibold text-neutralDark border-b border-border">
+																			{col}
+																		</th>
+																	))}
+																</tr>
+															</thead>
+															<tbody>
+																<tr className="bg-white/60">
+																	{cols.map((col, idx) => (
+																		<td key={idx} className="px-2 py-2 text-center text-muted-foreground border-b border-border">
+																			…
+																		</td>
+																	))}
+																</tr>
+															</tbody>
+														</table>
+													</div>
+												);
+											})()}
+										</div>
+									</div>
+									{assessment.gameLevel?.tableB && (
+										<div className="border rounded p-3 bg-white flex-1">
+											<p className="font-semibold text-body">Table B</p>
+											<p className="text-muted-foreground text-sm">{assessment.gameLevel.tableB}</p>
+										</div>
+									)}
+								</div>
+							</div>
+							{gameMessage && (
+								<p className={`mt-2 text-sm ${gameResult?.ok ? 'text-emerald-600' : 'text-amber-600'}`}>
+									{gameMessage}
+								</p>
+							)}
+						</CardContent>
+					</Card>
+				</div>
+			)}
+
 			{/* Questions */}
-			{assessment?.questions && assessment.questions.length > 0 && (
+			{assessment?.type !== 'gameLevel' && assessment?.questions && assessment.questions.length > 0 && (
 				<div className="space-y-6">
 					{assessment.questions.map((question, index) => (
 						<Card key={index}>
