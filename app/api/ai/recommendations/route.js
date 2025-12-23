@@ -10,8 +10,9 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 // Helper to get user info from cookies
 async function getUserId() {
 	const cookieStore = await cookies();
-	const userId = cookieStore.get('userId')?.value;
-	return userId;
+	// Session API sets `user_id` – keep backward compat with any older `userId` usage
+	const userId = cookieStore.get('user_id')?.value || cookieStore.get('userId')?.value;
+	return userId || null;
 }
 
 // Sample recommendation generator (deterministic stub)
@@ -289,9 +290,12 @@ export async function POST(request) {
 		
 		// Generate recommendations
 		const recommendations = generateRecommendations(performanceData, language);
-		
+
+		// Expose weak/strong areas so the frontend can show detailed insights
 		return NextResponse.json({
 			recommendations,
+			weakAreas,
+			strongAreas,
 			performanceSummary: {
 				enrolledCoursesCount: enrollments.length,
 				completedLessonsCount: completedLessons.length,
