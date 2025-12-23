@@ -1,3 +1,33 @@
+/**
+ * US010-02: View Class Performance Insight
+ * US010-05: Identify At-Risk Student
+ * US010-06: View Risk Indicator
+ * 
+ * This page provides comprehensive class performance analytics for instructors.
+ * 
+ * Features:
+ * - Overall class statistics (completion rates, average scores)
+ * - Individual student performance tracking
+ * - At-risk student identification based on configurable thresholds
+ * - Risk indicators: low scores, missed deadlines, inactivity
+ * - Anonymized class-level risk overview
+ * - Per-student detailed risk indicators
+ * - Performance trends and topic heatmaps
+ * - Export functionality (JSON and CSV)
+ * 
+ * Risk Assessment Criteria:
+ * - Average score below threshold (default: 60%)
+ * - Missed deadlines exceeding limit (default: 2)
+ * - Days inactive exceeding limit (default: 7 days)
+ * 
+ * Acceptance Criteria:
+ * - Instructor can view class performance insights
+ * - At-risk students are automatically identified
+ * - Risk indicators are visually highlighted
+ * - Data is updated in near real-time
+ * - Class-level view is anonymized
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
