@@ -10,10 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CourseModuleManager from '@/app/components/CourseModuleManager';
-import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function NewCoursePage() {
-	const { language } = useLanguage();
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
 	const [publish, setPublish] = useState(false);
@@ -23,42 +21,6 @@ export default function NewCoursePage() {
 	const [userRole, setUserRole] = useState(null);
 	const [modules, setModules] = useState([]);
 	const router = useRouter();
-
-	// Translations
-	const translations = {
-		en: {
-			pageTitle: 'Create Course',
-			titleLabel: 'Title',
-			titlePlaceholder: 'Enter course title',
-			descriptionLabel: 'Description',
-			descriptionPlaceholder: 'Enter course description',
-			publishImmediately: 'Publish immediately',
-			saveCourse: 'Save Course',
-			saving: 'Saving…',
-			signInError: 'You must be signed in to create a course',
-			roleError: 'Only teachers and admins can create courses',
-			saveFailed: 'Failed to save course',
-			publishedSuccess: (title) => `Course "${title}" published successfully!`,
-			draftSuccess: (title) => `Course "${title}" saved as draft. You can continue editing and publish when ready.`,
-		},
-		bm: {
-			pageTitle: 'Cipta Kursus',
-			titleLabel: 'Tajuk',
-			titlePlaceholder: 'Masukkan tajuk kursus',
-			descriptionLabel: 'Penerangan',
-			descriptionPlaceholder: 'Masukkan penerangan kursus',
-			publishImmediately: 'Terbitkan serta-merta',
-			saveCourse: 'Simpan Kursus',
-			saving: 'Menyimpan…',
-			signInError: 'Anda mesti log masuk untuk mencipta kursus',
-			roleError: 'Hanya guru dan admin boleh mencipta kursus',
-			saveFailed: 'Gagal menyimpan kursus',
-			publishedSuccess: (title) => `Kursus "${title}" diterbitkan dengan jayanya!`,
-			draftSuccess: (title) => `Kursus "${title}" disimpan sebagai draf. Anda boleh terus mengedit dan menerbitkan apabila sedia.`,
-		},
-	};
-
-	const t = translations[language] || translations.en;
 
 	useEffect(() => {
 		// Get user role on mount
@@ -82,7 +44,7 @@ export default function NewCoursePage() {
 		// Check if user is authenticated
 		const user = auth.currentUser;
 		if (!user) {
-			setError(t.signInError);
+			setError('You must be signed in to create a course');
 			setSubmitting(false);
 			return;
 		}
@@ -93,7 +55,7 @@ export default function NewCoursePage() {
 			const userData = userDoc.exists() ? userDoc.data() : null;
 			
 			if (!userData || (userData.role !== 'admin' && userData.role !== 'teacher')) {
-				setError(t.roleError);
+				setError('Only teachers and admins can create courses');
 				setSubmitting(false);
 				return;
 			}
@@ -123,8 +85,6 @@ export default function NewCoursePage() {
 							title: module.title,
 							order: module.order || 0,
 							lessons: [],
-							courseId: newCourseId, // Module belongs to this course
-							createdBy: user.uid,
 							createdAt: serverTimestamp(),
 							updatedAt: serverTimestamp(),
 						};
@@ -185,8 +145,8 @@ export default function NewCoursePage() {
 			const isPublished = publish;
 			setSuccess(
 				isPublished
-					? t.publishedSuccess(title)
-					: t.draftSuccess(title)
+					? `Course "${title}" published successfully!`
+					: `Course "${title}" saved as draft. You can continue editing and publish when ready.`
 			);
 
 			// Clear form fields
@@ -205,7 +165,7 @@ export default function NewCoursePage() {
 			}, 2000);
 		} catch (err) {
 			console.error('Course creation error:', err);
-			setError(err.message || t.saveFailed);
+			setError(err.message || 'Failed to save course');
 		} finally {
 			setSubmitting(false);
 		}
@@ -213,29 +173,29 @@ export default function NewCoursePage() {
 
 	return (
 		<div className="max-w-2xl mx-auto">
-			<h1 className="text-h1 text-neutralDark mb-8">{t.pageTitle}</h1>
+			<h1 className="text-h1 text-neutralDark mb-8">Create Course</h1>
 			<Card>
 				<CardContent className="pt-6">
 					<form onSubmit={onSubmit} className="space-y-6">
 						<label className="block">
-							<span className="block text-body font-medium text-neutralDark mb-2">{t.titleLabel}</span>
+							<span className="block text-body font-medium text-neutralDark mb-2">Title</span>
 							<Input
 								required
 								type="text"
 								value={title}
 								onChange={(e) => setTitle(e.target.value)}
-								placeholder={t.titlePlaceholder}
+								placeholder="Enter course title"
 							/>
 						</label>
 
 						<label className="block">
-							<span className="block text-body font-medium text-neutralDark mb-2">{t.descriptionLabel}</span>
+							<span className="block text-body font-medium text-neutralDark mb-2">Description</span>
 							<textarea
 								value={description}
 								onChange={(e) => setDescription(e.target.value)}
 								rows={4}
 								className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-body ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
-								placeholder={t.descriptionPlaceholder}
+								placeholder="Enter course description"
 							/>
 						</label>
 
@@ -246,7 +206,7 @@ export default function NewCoursePage() {
 								onChange={(e) => setPublish(e.target.checked)}
 								className="w-5 h-5 rounded border-input text-primary focus:ring-2 focus:ring-ring cursor-pointer"
 							/>
-							<span className="text-body text-neutralDark">{t.publishImmediately}</span>
+							<span className="text-body text-neutralDark">Publish immediately</span>
 						</label>
 
 						{/* Modules & Lessons Manager (Optional) */}
@@ -265,7 +225,7 @@ export default function NewCoursePage() {
 								className="w-full"
 								size="lg"
 							>
-								{submitting ? t.saving : t.saveCourse}
+								{submitting ? 'Saving…' : 'Save Course'}
 							</Button>
 						</div>
 					</form>
