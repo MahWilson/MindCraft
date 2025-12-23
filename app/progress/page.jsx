@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { BookOpen, CheckCircle2, Clock, Award, FileText, ClipboardCheck, TrendingUp, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '@/app/contexts/LanguageContext';
+import { BarChart, LineChart } from '@tremor/react';
 
 export default function ProgressPage() {
 	const { language } = useLanguage();
@@ -295,15 +296,22 @@ export default function ProgressPage() {
 	return (
 		<div className="space-y-8">
 			{/* Header */}
-			<div>
-				<h1 className="text-h1 text-neutralDark mb-2">
-					{language === 'bm' ? 'Kemajuan Saya' : 'My Progress'}
-				</h1>
-				<p className="text-body text-muted-foreground">
-					{language === 'bm' 
-						? 'Ikuti kemajuan pembelajaran anda merentas semua kursus yang didaftarkan'
-						: 'Track your learning progress across all enrolled courses'}
-				</p>
+			<div className="flex items-start justify-between gap-4">
+				<div>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Kemajuan Saya' : 'My Progress'}
+					</h1>
+					<p className="text-body text-muted-foreground">
+						{language === 'bm' 
+							? 'Ikuti kemajuan pembelajaran anda merentas semua kursus yang didaftarkan'
+							: 'Track your learning progress across all enrolled courses'}
+					</p>
+				</div>
+				<Link href="/weak-areas">
+					<Button variant="outline" size="sm">
+						{language === 'bm' ? 'Bidang Lemah' : 'Weak Areas'}
+					</Button>
+				</Link>
 			</div>
 
 			{/* Summary Cards */}
