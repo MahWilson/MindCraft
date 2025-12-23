@@ -1,3 +1,21 @@
+/**
+ * US010-04: Identify Weak Learning Areas
+ * 
+ * This page allows students to view topics they struggle with based on their performance.
+ * Weak areas are identified by analyzing assessment and assignment scores grouped by topic/module.
+ * 
+ * Features:
+ * - Displays topics where student scored below 70%
+ * - Shows average score per topic
+ * - Provides recommendations for improvement
+ * - Links to relevant course content for review
+ * 
+ * Acceptance Criteria:
+ * - Student can view weak learning areas
+ * - Topics are identified based on performance thresholds
+ * - Data is updated in real-time from submissions
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
