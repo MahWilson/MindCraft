@@ -18,7 +18,7 @@ Mohamed Omar Makhlouf A23CS4014 (Tester 1)
 Fam Qai Zen A23CS0223 (Tester 2)
 
 
-##  Tech Stack
+##Tech Stack
 
 - **Frontend**: Next.js 14 (App Router), TailwindCSS , React
 - **Backend**: Next.js API Routes
@@ -26,7 +26,6 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - **Authentication**: Firebase Auth
 - **Hosting**: Firebase Hosting (planned)
 
-#
  **Completed:**
 - Firebase Auth integration
 - Firestore database setup
