@@ -8,13 +8,56 @@ import { db } from '@/firebase';
 import CourseManagement from './CourseManagement';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function AdminCoursesPage() {
+	const { language } = useLanguage();
 	const [draftCourses, setDraftCourses] = useState([]);
 	const [publishedCourses, setPublishedCourses] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [role, setRole] = useState(null);
 	const [userId, setUserId] = useState(null);
+	const [searchTerm, setSearchTerm] = useState('');
+
+	// Translations
+	const translations = {
+		en: {
+			pageTitle: 'Manage Courses',
+			pageDescription: 'Create, edit, and manage your courses',
+			createCourse: 'Create Course',
+			draftCourses: 'Draft Courses',
+			publishedCourses: 'Published Courses',
+			draft: 'draft',
+			drafts: 'drafts',
+			course: 'course',
+			courses: 'courses',
+			noDraftCourses: 'No draft courses yet',
+			noPublishedCourses: 'No published courses yet',
+			loading: 'Loading courses...',
+			unauthorized: 'Unauthorized: Admin or Teacher access required',
+			searchPlaceholder: 'Search courses by title or description',
+		},
+		bm: {
+			pageTitle: 'Urus Kursus',
+			pageDescription: 'Cipta, edit, dan urus kursus anda',
+			createCourse: 'Cipta Kursus',
+			draftCourses: 'Kursus Draf',
+			publishedCourses: 'Kursus Diterbitkan',
+			draft: 'draf',
+			drafts: 'draf',
+			course: 'kursus',
+			courses: 'kursus',
+			noDraftCourses: 'Tiada kursus draf lagi',
+			noPublishedCourses: 'Tiada kursus diterbitkan lagi',
+			loading: 'Memuatkan kursus...',
+			unauthorized: 'Tidak dibenarkan: Akses Admin atau Guru diperlukan',
+			searchPlaceholder: 'Cari kursus mengikut tajuk atau penerangan',
+		},
+	};
+
+	const t = translations[language] || translations.en;
 
 	useEffect(() => {
 		// Wait for Firebase Auth to initialize
@@ -133,11 +176,29 @@ export default function AdminCoursesPage() {
 		}
 	}
 
+	const normalizedSearch = searchTerm.trim().toLowerCase();
+
+	const filteredDraftCourses = normalizedSearch
+		? draftCourses.filter((course) => {
+				const title = (course.title || '').toLowerCase();
+				const description = (course.description || '').toLowerCase();
+				return title.includes(normalizedSearch) || description.includes(normalizedSearch);
+		  })
+		: draftCourses;
+
+	const filteredPublishedCourses = normalizedSearch
+		? publishedCourses.filter((course) => {
+				const title = (course.title || '').toLowerCase();
+				const description = (course.description || '').toLowerCase();
+				return title.includes(normalizedSearch) || description.includes(normalizedSearch);
+		  })
+		: publishedCourses;
+
 	if (role !== 'admin' && role !== 'teacher') {
 		return (
 			<Card className="border-error bg-error/5">
 				<CardContent className="pt-6">
-					<p className="text-body text-error">Unauthorized: Admin or Teacher access required</p>
+					<p className="text-body text-error">{t.unauthorized}</p>
 				</CardContent>
 			</Card>
 		);
@@ -146,7 +207,7 @@ export default function AdminCoursesPage() {
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
-				<p className="text-body text-muted-foreground">Loading courses...</p>
+				<p className="text-body text-muted-foreground">{t.loading}</p>
 			</div>
 		);
 	}
@@ -154,33 +215,42 @@ export default function AdminCoursesPage() {
 	return (
 		<div className="space-y-8">
 			{/* Page Header */}
-			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Manage Courses</h1>
-					<p className="text-body text-muted-foreground">Create, edit, and manage your courses</p>
+			<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+				<div className="space-y-2">
+					<h1 className="text-h1 text-neutralDark">{t.pageTitle}</h1>
+					<p className="text-body text-muted-foreground">{t.pageDescription}</p>
+					<div className="mt-2 max-w-md relative">
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+						<Input
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							placeholder={t.searchPlaceholder}
+							className="w-full pl-10"
+						/>
+					</div>
 				</div>
-				<a href="/dashboard/courses/new">
-					<Button size="lg">Create Course</Button>
+				<a href="/dashboard/courses/new" className="self-start md:self-auto">
+					<Button size="lg">{t.createCourse}</Button>
 				</a>
 			</div>
 
 			{/* Draft Courses */}
 			<div>
 				<div className="flex items-center justify-between mb-6">
-					<h2 className="text-h2 text-neutralDark">Draft Courses</h2>
+					<h2 className="text-h2 text-neutralDark">{t.draftCourses}</h2>
 					<span className="px-3 py-1 rounded-full bg-warning/10 text-warning text-caption font-medium">
-						{draftCourses.length} {draftCourses.length === 1 ? 'draft' : 'drafts'}
+						{filteredDraftCourses.length} {filteredDraftCourses.length === 1 ? t.draft : t.drafts}
 					</span>
 				</div>
-				{draftCourses.length === 0 ? (
+				{filteredDraftCourses.length === 0 ? (
 					<Card>
 						<CardContent className="pt-6">
-							<p className="text-body text-muted-foreground text-center py-8">No draft courses yet</p>
+							<p className="text-body text-muted-foreground text-center py-8">{t.noDraftCourses}</p>
 						</CardContent>
 					</Card>
 				) : (
 					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-						{draftCourses.map((course) => (
+						{filteredDraftCourses.map((course) => (
 							<CourseManagement key={course.id} course={course} currentUserId={userId} currentRole={role} />
 						))}
 					</div>
@@ -190,20 +260,20 @@ export default function AdminCoursesPage() {
 			{/* Published Courses */}
 			<div>
 				<div className="flex items-center justify-between mb-6">
-					<h2 className="text-h2 text-neutralDark">Published Courses</h2>
+					<h2 className="text-h2 text-neutralDark">{t.publishedCourses}</h2>
 					<span className="px-3 py-1 rounded-full bg-success/10 text-success text-caption font-medium">
-						{publishedCourses.length} {publishedCourses.length === 1 ? 'course' : 'courses'}
+						{filteredPublishedCourses.length} {filteredPublishedCourses.length === 1 ? t.course : t.courses}
 					</span>
 				</div>
-				{publishedCourses.length === 0 ? (
+				{filteredPublishedCourses.length === 0 ? (
 					<Card>
 						<CardContent className="pt-6">
-							<p className="text-body text-muted-foreground text-center py-8">No published courses yet</p>
+							<p className="text-body text-muted-foreground text-center py-8">{t.noPublishedCourses}</p>
 						</CardContent>
 					</Card>
 				) : (
 					<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-						{publishedCourses.map((course) => (
+						{filteredPublishedCourses.map((course) => (
 							<CourseManagement key={course.id} course={course} currentUserId={userId} currentRole={role} />
 						))}
 					</div>
