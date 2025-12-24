@@ -31,6 +31,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - **Hosting**: Firebase Hosting (planned)
 
  # **Completed:**
+ 
 - Firebase Auth integration
 - Firestore database setup
 - Course management (CRUD)
