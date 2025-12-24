@@ -34,6 +34,8 @@ Fam Qai Zen A23CS0223 (Tester 2)
   
 - **Hosting**: Firebase Hosting (planned)
 
+# System Architecture
+
  # **Completed:**
  
 - Firebase Auth integration
