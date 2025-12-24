@@ -30,7 +30,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - **Authentication**: Firebase Auth
 - **Hosting**: Firebase Hosting (planned)
 
- **Completed:**
+ # **Completed:**
 - Firebase Auth integration
 - Firestore database setup
 - Course management (CRUD)
@@ -39,11 +39,9 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - Course modules/lessons
 - Assessments
 - Progress tracking
-
- **In Progress:**
 - Student submissions
   
- **Planned:**
+ # **Planned:**
 - AI features (Gemini API)
 - Discussion forum
 - Offline support
