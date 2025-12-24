@@ -37,7 +37,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 # System Architecture
 
 MindCraft follows a **Serverless Architecture** using Next.js and Firebase:
-
+* **Client**: React components styled with TailwindCSS for a responsive UI.
 # **Completed**
  
 - Firebase Auth integration
