@@ -1,8 +1,11 @@
 # MindCraft
 
-AI-assisted learning platform for secondary school programming education.
+An AI-powered learning platform designed to make programming education smarter, more interactive, and more accessible for secondary school students.
 
-Development Team Members:
+# Project Overview
+MindCraft leverages modern web technologies and AI assistance to support structured learning, assessments, and progress tracking in programming education. The platform is built with scalability, usability, and future AI integration in mind.
+
+Development Team:
 Mah Wilson A23CS0243 (Team Leader)
 
 Tan Jian Ming A23CS0275 (Scrum Master)
@@ -37,8 +40,8 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - Progress tracking
 
  **In Progress:**
-
 - Student submissions
+  
  **Planned:**
 - AI features (Gemini API)
 - Discussion forum
