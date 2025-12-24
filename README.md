@@ -25,9 +25,13 @@ Fam Qai Zen A23CS0223 (Tester 2)
 # Tech Stack
 
 - **Frontend**: Next.js 14 (App Router), TailwindCSS , React
+
 - **Backend**: Next.js API Routes
+  
 - **Database**: Firebase Firestore
+  
 - **Authentication**: Firebase Auth
+  
 - **Hosting**: Firebase Hosting (planned)
 
  # **Completed:**
