@@ -41,7 +41,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - Course management (CRUD)
 - Role-based access control
 - User registration
-- Course modules/lessons
+- Course modules/assignments
 - Assessments
 - Progress tracking
 - Student submissions
