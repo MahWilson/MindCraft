@@ -676,15 +676,55 @@ export default function AssessmentsPage() {
 													)}
 												</div>
 											) : (
-												<Link 
-													href={`/assessments/${assessment.id}/take`} 
-													className="flex-1 min-w-[100px]"
-												>
-													<Button variant="default" className="w-full" title={language === 'bm' ? 'Ambil Penilaian' : 'Take Assessment'}>
-														{language === 'bm' ? 'Ambil Penilaian' : 'Take Assessment'}
-														<ArrowRight className="h-5 w-5 ml-2" />
-													</Button>
-												</Link>
+												<div className="w-full space-y-3">
+													{(() => {
+														const submission = submissions[assessment.id];
+														if (!submission || submission.score === undefined) return null;
+														
+														const percentage = submission.totalPoints > 0 
+															? (submission.score / submission.totalPoints) * 100 
+															: 0;
+														const passed = percentage > 40;
+														
+														return (
+															<div className={`p-2 rounded-lg border-2 ${
+																passed 
+																	? 'bg-success/10 border-success/30' 
+																	: 'bg-destructive/10 border-destructive/30'
+															}`}>
+																<div className="flex items-center justify-between">
+																	<div className="flex items-center gap-2">
+																		{passed ? (
+																			<CheckCircle className="h-4 w-4 text-success" />
+																		) : (
+																			<XCircle className="h-4 w-4 text-destructive" />
+																		)}
+																		<span className={`text-sm font-semibold ${
+																			passed ? 'text-success' : 'text-destructive'
+																		}`}>
+																			{passed 
+																				? (language === 'bm' ? 'LULUS' : 'PASS')
+																				: (language === 'bm' ? 'GAGAL' : 'FAIL')
+																			}
+																		</span>
+																	</div>
+																	<span className="text-sm text-muted-foreground">
+																		{submission.score}/{submission.totalPoints} ({percentage.toFixed(1)}%)
+																	</span>
+																</div>
+															</div>
+														);
+													})()}
+													<Link 
+														href={`/assessments/${assessment.id}/take`} 
+														className="flex-1 min-w-[100px]"
+													>
+														<Button variant="default" className="w-full" title={language === 'bm' ? 'Ambil Penilaian' : 'Take Assessment'}>
+															{language === 'bm' ? 'Ambil Penilaian' : 'Take Assessment'}
+															<ArrowRight className="h-5 w-5 ml-2" />
+														</Button>
+													</Link>
+												</div>
 											)
 										) : (
 											<>
