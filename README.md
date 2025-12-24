@@ -5,7 +5,7 @@ An AI-powered learning platform designed to make programming education smarter, 
 # Project Overview
 MindCraft leverages modern web technologies and AI assistance to support structured learning, assessments, and progress tracking in programming education. The platform is built with scalability, usability, and future AI integration in mind.
 
-# Development Team:
+# Development Team
 
 Mah Wilson A23CS0243 (Team Leader)
 
@@ -36,7 +36,7 @@ Fam Qai Zen A23CS0223 (Tester 2)
 
 # System Architecture
 
- # **Completed:**
+# **Completed**
  
 - Firebase Auth integration
 - Firestore database setup
@@ -50,6 +50,6 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - AI features (Gemini API)
 - Discussion forum
   
- # **Planned:**
+ # **Planned**
 - Offline support
 - Mobile app integration
