@@ -45,9 +45,9 @@ Fam Qai Zen A23CS0223 (Tester 2)
 - Assessments
 - Progress tracking
 - Student submissions
+- AI features (Gemini API)
 - Discussion forum
   
  # **Planned:**
-- AI features (Gemini API)
 - Offline support
 - Mobile app integration
