@@ -36,6 +36,8 @@ Fam Qai Zen A23CS0223 (Tester 2)
 
 # System Architecture
 
+MindCraft follows a **Serverless Architecture** using Next.js and Firebase:
+
 # **Completed**
  
 - Firebase Auth integration
