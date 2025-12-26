@@ -27,6 +27,13 @@ export default function CreateAssessmentPage() {
 	const [userRole, setUserRole] = useState(null);
 	const [generating, setGenerating] = useState(false);
 	const [published, setPublished] = useState(false);
+	const [config, setConfig] = useState({
+		startDate: '',
+		endDate: '',
+		timer: '',
+		attempts: 1,
+		passingPercentage: 40,
+	});
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -92,7 +99,7 @@ export default function CreateAssessmentPage() {
 	}
 
 	function updateQuestion(questionId, field, value) {
-		setQuestions(questions.map(q => 
+		setQuestions(questions.map(q =>
 			q.id === questionId ? { ...q, [field]: value } : q
 		));
 	}
@@ -125,8 +132,8 @@ export default function CreateAssessmentPage() {
 		setQuestions(questions.map(q => {
 			if (q.id === questionId && q.options.length > 2) {
 				const newOptions = q.options.filter((_, idx) => idx !== optionIndex);
-				return { 
-					...q, 
+				return {
+					...q,
 					options: newOptions,
 					correctAnswer: q.correctAnswer >= newOptions.length ? 0 : q.correctAnswer
 				};
@@ -160,6 +167,13 @@ export default function CreateAssessmentPage() {
 						type,
 						numQuestions: 5,
 					},
+					config: {
+						startDate: config.startDate ? new Date(config.startDate) : null,
+						endDate: config.endDate ? new Date(config.endDate) : null,
+						timer: config.timer ? parseInt(config.timer) : null,
+						attempts: config.attempts ? parseInt(config.attempts) : null,
+						passingPercentage: config.passingPercentage ? parseInt(config.passingPercentage) : 40,
+					},
 				}),
 			});
 
@@ -168,7 +182,7 @@ export default function CreateAssessmentPage() {
 			}
 
 			const data = await response.json();
-			
+
 			if (data.title) {
 				setTitle(data.title);
 			}
@@ -246,6 +260,13 @@ export default function CreateAssessmentPage() {
 					points: q.points || 1,
 				})),
 				published,
+				config: {
+					startDate: config.startDate ? new Date(config.startDate) : null,
+					endDate: config.endDate ? new Date(config.endDate) : null,
+					timer: config.timer ? parseInt(config.timer) : null,
+					attempts: config.attempts ? parseInt(config.attempts) : null,
+					passingPercentage: config.passingPercentage ? parseInt(config.passingPercentage) : 40,
+				},
 				createdBy: auth.currentUser.uid,
 				createdAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
@@ -529,11 +550,10 @@ export default function CreateAssessmentPage() {
 														key={points}
 														type="button"
 														onClick={() => updateQuestion(question.id, 'points', points)}
-														className={`px-4 py-2 rounded-md font-medium transition-all ${
-															(question.points || 1) === points
-																? 'bg-primary text-white shadow-sm'
-																: 'bg-neutralLight text-neutralDark hover:bg-primary/10 border border-border'
-														}`}
+														className={`px-4 py-2 rounded-md font-medium transition-all ${(question.points || 1) === points
+															? 'bg-primary text-white shadow-sm'
+															: 'bg-neutralLight text-neutralDark hover:bg-primary/10 border border-border'
+															}`}
 													>
 														{points}
 													</button>
@@ -564,6 +584,68 @@ export default function CreateAssessmentPage() {
 								<label htmlFor="published" className="text-sm font-medium cursor-pointer">
 									Publish immediately (visible to students)
 								</label>
+							</div>
+
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label htmlFor="startDate" className="block text-sm font-medium mb-2">
+										Start Date
+									</label>
+									<Input
+										id="startDate"
+										type="datetime-local"
+										value={config.startDate}
+										onChange={(e) => setConfig({ ...config, startDate: e.target.value })}
+									/>
+								</div>
+								<div>
+									<label htmlFor="endDate" className="block text-sm font-medium mb-2">
+										End Date
+									</label>
+									<Input
+										id="endDate"
+										type="datetime-local"
+										value={config.endDate}
+										onChange={(e) => setConfig({ ...config, endDate: e.target.value })}
+									/>
+								</div>
+								<div>
+									<label htmlFor="timer" className="block text-sm font-medium mb-2">
+										Timer (minutes)
+									</label>
+									<Input
+										id="timer"
+										type="number"
+										value={config.timer}
+										onChange={(e) => setConfig({ ...config, timer: e.target.value })}
+										placeholder="e.g., 60"
+									/>
+								</div>
+								<div>
+									<label htmlFor="attempts" className="block text-sm font-medium mb-2">
+										Max Attempts
+									</label>
+									<Input
+										id="attempts"
+										type="number"
+										value={config.attempts}
+										onChange={(e) => setConfig({ ...config, attempts: parseInt(e.target.value) || 1 })}
+										min="1"
+									/>
+								</div>
+								<div>
+									<label htmlFor="passingPercentage" className="block text-sm font-medium mb-2">
+										Passing Percentage (%)
+									</label>
+									<Input
+										id="passingPercentage"
+										type="number"
+										value={config.passingPercentage}
+										onChange={(e) => setConfig({ ...config, passingPercentage: parseInt(e.target.value) || 0 })}
+										min="0"
+										max="100"
+									/>
+								</div>
 							</div>
 						</CardContent>
 					</Card>

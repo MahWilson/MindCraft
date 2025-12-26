@@ -37,6 +37,7 @@ export default function EditAssessmentPage() {
 		endDate: '',
 		timer: '',
 		attempts: 1,
+		passingPercentage: 40,
 	});
 
 	useEffect(() => {
@@ -102,7 +103,7 @@ export default function EditAssessmentPage() {
 			setCourseTitle(assessmentData.courseTitle || '');
 			setType(assessmentData.type || 'quiz');
 			setPublished(assessmentData.published || false);
-			
+
 			// Load questions
 			if (assessmentData.questions && Array.isArray(assessmentData.questions)) {
 				setQuestions(assessmentData.questions.map((q, idx) => ({
@@ -118,10 +119,10 @@ export default function EditAssessmentPage() {
 			// Load config
 			if (assessmentData.config) {
 				const configData = assessmentData.config;
-				const startDate = configData.startDate 
+				const startDate = configData.startDate
 					? (configData.startDate.toDate ? configData.startDate.toDate() : new Date(configData.startDate))
 					: null;
-				const endDate = configData.endDate 
+				const endDate = configData.endDate
 					? (configData.endDate.toDate ? configData.endDate.toDate() : new Date(configData.endDate))
 					: null;
 
@@ -130,6 +131,7 @@ export default function EditAssessmentPage() {
 					endDate: endDate ? formatDateForInput(endDate) : '',
 					timer: configData.timer || '',
 					attempts: configData.attempts || 1,
+					passingPercentage: configData.passingPercentage !== undefined ? configData.passingPercentage : 40,
 				});
 			}
 		} catch (err) {
@@ -170,7 +172,7 @@ export default function EditAssessmentPage() {
 	}
 
 	function updateQuestion(questionId, field, value) {
-		setQuestions(questions.map(q => 
+		setQuestions(questions.map(q =>
 			q.id === questionId ? { ...q, [field]: value } : q
 		));
 	}
@@ -203,8 +205,8 @@ export default function EditAssessmentPage() {
 		setQuestions(questions.map(q => {
 			if (q.id === questionId && q.options.length > 2) {
 				const newOptions = q.options.filter((_, idx) => idx !== optionIndex);
-				return { 
-					...q, 
+				return {
+					...q,
 					options: newOptions,
 					correctAnswer: q.correctAnswer >= newOptions.length ? 0 : q.correctAnswer
 				};
@@ -246,7 +248,7 @@ export default function EditAssessmentPage() {
 			}
 
 			const data = await response.json();
-			
+
 			if (data.title) {
 				setTitle(data.title);
 			}
@@ -330,6 +332,7 @@ export default function EditAssessmentPage() {
 					endDate: config.endDate ? new Date(config.endDate) : null,
 					timer: config.timer ? parseInt(config.timer) : null,
 					attempts: config.attempts ? parseInt(config.attempts) : null,
+					passingPercentage: config.passingPercentage ? parseInt(config.passingPercentage) : 40,
 				},
 			};
 
@@ -646,11 +649,10 @@ export default function EditAssessmentPage() {
 														key={points}
 														type="button"
 														onClick={() => updateQuestion(question.id, 'points', points)}
-														className={`px-4 py-2 rounded-md font-medium transition-all ${
-															(question.points || 1) === points
+														className={`px-4 py-2 rounded-md font-medium transition-all ${(question.points || 1) === points
 																? 'bg-primary text-white shadow-sm'
 																: 'bg-neutralLight text-neutralDark hover:bg-primary/10 border border-border'
-														}`}
+															}`}
 													>
 														{points}
 													</button>
@@ -728,6 +730,19 @@ export default function EditAssessmentPage() {
 										value={config.attempts}
 										onChange={(e) => setConfig({ ...config, attempts: parseInt(e.target.value) || 1 })}
 										min="1"
+									/>
+								</div>
+								<div>
+									<label htmlFor="passingPercentage" className="block text-sm font-medium mb-2">
+										Passing Percentage (%)
+									</label>
+									<Input
+										id="passingPercentage"
+										type="number"
+										value={config.passingPercentage}
+										onChange={(e) => setConfig({ ...config, passingPercentage: parseInt(e.target.value) || 0 })}
+										min="0"
+										max="100"
 									/>
 								</div>
 							</div>

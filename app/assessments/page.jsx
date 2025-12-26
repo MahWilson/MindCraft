@@ -83,7 +83,7 @@ export default function AssessmentsPage() {
 		setLoading(true);
 		try {
 			let assessmentsQuery;
-			
+
 			if (userRole === 'student') {
 				// First, get all published assessments
 				// Note: We query without orderBy first to avoid index issues, then sort client-side
@@ -91,7 +91,7 @@ export default function AssessmentsPage() {
 					collection(db, 'assessment'),
 					where('published', '==', true)
 				);
-				
+
 				const snapshot = await getDocs(assessmentsQuery);
 				const allAssessments = snapshot.docs.map(doc => ({
 					id: doc.id,
@@ -115,7 +115,7 @@ export default function AssessmentsPage() {
 					);
 
 					// Filter assessments to only those for enrolled courses
-					const filteredAssessments = allAssessments.filter(assessment => 
+					const filteredAssessments = allAssessments.filter(assessment =>
 						assessment.courseId && enrolledCourseIds.has(assessment.courseId)
 					);
 
@@ -147,14 +147,14 @@ export default function AssessmentsPage() {
 
 	async function loadSubmissions() {
 		if (!currentUserId) return;
-		
+
 		try {
 			const submissionsQuery = query(
 				collection(db, 'submission'),
 				where('studentId', '==', currentUserId)
 			);
 			const snapshot = await getDocs(submissionsQuery);
-			
+
 			const submissionsMap = {};
 			snapshot.docs.forEach(doc => {
 				const data = doc.data();
@@ -163,9 +163,9 @@ export default function AssessmentsPage() {
 					...data,
 				};
 			});
-			
+
 			setSubmissions(submissionsMap);
-			
+
 			// Initialize uploaded files from existing submissions
 			const filesMap = {};
 			Object.keys(submissionsMap).forEach(assessmentId => {
@@ -193,9 +193,9 @@ export default function AssessmentsPage() {
 	function formatDate(timestamp) {
 		if (!timestamp) return language === 'bm' ? 'Tiada tarikh ditetapkan' : 'No date set';
 		const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-		return date.toLocaleDateString(language === 'bm' ? 'ms-MY' : 'en-US', { 
-			year: 'numeric', 
-			month: 'short', 
+		return date.toLocaleDateString(language === 'bm' ? 'ms-MY' : 'en-US', {
+			year: 'numeric',
+			month: 'short',
 			day: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit'
@@ -295,7 +295,7 @@ export default function AssessmentsPage() {
 		}
 
 		const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-		
+
 		setUploadingFiles(prev => ({
 			...prev,
 			[assessmentId]: [...(prev[assessmentId] || []), { id: fileId, name: file.name, size: file.size, uploading: true }]
@@ -309,7 +309,7 @@ export default function AssessmentsPage() {
 			// Upload to Firebase Storage
 			const filePath = `assignment-submissions/${assessmentId}/${fileId}_${file.name}`;
 			const fileRef = ref(storage, filePath);
-			
+
 			await uploadBytes(fileRef, file);
 			const downloadURL = await getDownloadURL(fileRef);
 
@@ -458,7 +458,7 @@ export default function AssessmentsPage() {
 						{language === 'bm' ? 'Penilaian' : 'Assessments'}
 					</h1>
 					<p className="text-body text-muted-foreground">
-						{userRole === 'student' 
+						{userRole === 'student'
 							? (language === 'bm' ? 'Lihat dan hantar tugasan anda' : 'View and submit your assignments')
 							: (language === 'bm' ? 'Urus penilaian dan lihat penghantaran' : 'Manage assessments and view submissions')}
 					</p>
@@ -487,7 +487,7 @@ export default function AssessmentsPage() {
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{assessments.map((assessment) => {
 						const deadlinePassed = assessment.config?.endDate ? isDeadlinePassed(assessment.config.endDate) : false;
-						
+
 						return (
 							<Card key={assessment.id} className="card-hover">
 								<CardHeader className="bg-gradient-to-br from-primary/5 via-primary/3 to-white border-b-2 border-primary/20 pb-4">
@@ -505,7 +505,7 @@ export default function AssessmentsPage() {
 													</span>
 												)}
 												<span className="text-xs bg-info/10 text-info px-2.5 py-1.5 rounded-md font-medium border border-info/20 capitalize">
-													{language === 'bm' 
+													{language === 'bm'
 														? (assessment.type === 'quiz' ? 'kuiz' : assessment.type === 'assignment' ? 'tugasan' : assessment.type === 'coding' ? 'pengaturcaraan' : assessment.type || 'kuiz')
 														: (assessment.type || 'quiz')}
 												</span>
@@ -525,15 +525,15 @@ export default function AssessmentsPage() {
 											{stripHtml(assessment.description)}
 										</p>
 									)}
-									
+
 									{assessment.questions && (
 										<p className="text-sm text-muted-foreground">
-											{assessment.questions.length} {assessment.questions.length === 1 
+											{assessment.questions.length} {assessment.questions.length === 1
 												? (language === 'bm' ? 'soalan' : 'question')
 												: (language === 'bm' ? 'soalan' : 'questions')}
 										</p>
 									)}
-									
+
 									{assessment.config && (
 										<div className="space-y-2 text-sm">
 											{assessment.config.startDate && (
@@ -680,18 +680,18 @@ export default function AssessmentsPage() {
 													{(() => {
 														const submission = submissions[assessment.id];
 														if (!submission || submission.score === undefined) return null;
-														
-														const percentage = submission.totalPoints > 0 
-															? (submission.score / submission.totalPoints) * 100 
+
+														const percentage = submission.totalPoints > 0
+															? (submission.score / submission.totalPoints) * 100
 															: 0;
-														const passed = percentage > 40;
-														
+														const passingPercentage = assessment.config?.passingPercentage !== undefined ? assessment.config.passingPercentage : 40;
+														const passed = percentage >= passingPercentage;
+
 														return (
-															<div className={`p-2 rounded-lg border-2 ${
-																passed 
-																	? 'bg-success/10 border-success/30' 
+															<div className={`p-2 rounded-lg border-2 ${passed
+																	? 'bg-success/10 border-success/30'
 																	: 'bg-destructive/10 border-destructive/30'
-															}`}>
+																}`}>
 																<div className="flex items-center justify-between">
 																	<div className="flex items-center gap-2">
 																		{passed ? (
@@ -699,10 +699,9 @@ export default function AssessmentsPage() {
 																		) : (
 																			<XCircle className="h-4 w-4 text-destructive" />
 																		)}
-																		<span className={`text-sm font-semibold ${
-																			passed ? 'text-success' : 'text-destructive'
-																		}`}>
-																			{passed 
+																		<span className={`text-sm font-semibold ${passed ? 'text-success' : 'text-destructive'
+																			}`}>
+																			{passed
 																				? (language === 'bm' ? 'LULUS' : 'PASS')
 																				: (language === 'bm' ? 'GAGAL' : 'FAIL')
 																			}
@@ -715,8 +714,8 @@ export default function AssessmentsPage() {
 															</div>
 														);
 													})()}
-													<Link 
-														href={`/assessments/${assessment.id}/take`} 
+													<Link
+														href={`/assessments/${assessment.id}/take`}
 														className="flex-1 min-w-[100px]"
 													>
 														<Button variant="default" className="w-full" title={language === 'bm' ? 'Ambil Penilaian' : 'Take Assessment'}>
@@ -738,11 +737,11 @@ export default function AssessmentsPage() {
 													variant="outline"
 													size="sm"
 													onClick={() => togglePublish(assessment)}
-													title={assessment.published 
+													title={assessment.published
 														? (language === 'bm' ? 'Nyahterbit' : 'Unpublish')
 														: (language === 'bm' ? 'Terbitkan' : 'Publish')}
-													className={assessment.published 
-														? "border-warning/20 hover:bg-warning/10 hover:border-warning/40" 
+													className={assessment.published
+														? "border-warning/20 hover:bg-warning/10 hover:border-warning/40"
 														: "border-success/20 hover:bg-success/10 hover:border-success/40"}
 												>
 													{assessment.published ? (
@@ -779,7 +778,7 @@ export default function AssessmentsPage() {
 
 			{/* Delete Confirmation Modal */}
 			{deleteConfirm && (
-				<div 
+				<div
 					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
 					onClick={(e) => {
 						if (e.target === e.currentTarget) {
@@ -800,7 +799,7 @@ export default function AssessmentsPage() {
 								{language === 'bm' ? 'Sahkan Padam' : 'Confirm Delete'}
 							</CardTitle>
 							<CardDescription>
-								{language === 'bm' 
+								{language === 'bm'
 									? 'Adakah anda pasti mahu memadam penilaian ini? Tindakan ini tidak boleh dibatalkan.'
 									: 'Are you sure you want to delete this assessment? This action cannot be undone.'}
 							</CardDescription>
@@ -833,7 +832,7 @@ export default function AssessmentsPage() {
 
 			{/* Submit Confirmation Modal */}
 			{submitConfirm && (
-				<div 
+				<div
 					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
 					onClick={(e) => {
 						if (e.target === e.currentTarget) {
@@ -854,7 +853,7 @@ export default function AssessmentsPage() {
 								{language === 'bm' ? 'Sahkan Hantar' : 'Confirm Submit'}
 							</CardTitle>
 							<CardDescription>
-								{language === 'bm' 
+								{language === 'bm'
 									? 'Adakah anda pasti mahu menghantar tugasan ini?'
 									: 'Are you sure you want to submit this assignment?'}
 							</CardDescription>
@@ -865,7 +864,7 @@ export default function AssessmentsPage() {
 									{language === 'bm' ? 'Tugasan:' : 'Assignment:'} {submitConfirm.title}
 								</p>
 								<p className="text-xs text-muted-foreground">
-									{language === 'bm' 
+									{language === 'bm'
 										? `Anda akan menghantar ${submitConfirm.fileCount} ${submitConfirm.fileCount === 1 ? 'fail' : 'fail'}.`
 										: `You will submit ${submitConfirm.fileCount} ${submitConfirm.fileCount === 1 ? 'file' : 'files'}.`}
 								</p>
@@ -874,7 +873,7 @@ export default function AssessmentsPage() {
 								<div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
 									<p className="text-xs text-warning flex items-center gap-2">
 										<AlertCircle className="h-4 w-4" />
-										{language === 'bm' 
+										{language === 'bm'
 											? 'Anda telah menghantar tugasan ini sebelum ini. Menghantar semula akan menggantikan penghantaran sebelumnya.'
 											: 'You have already submitted this assignment. Resubmitting will replace your previous submission.'}
 									</p>
@@ -911,7 +910,7 @@ export default function AssessmentsPage() {
 
 			{/* Submit Success Modal */}
 			{submitSuccess && (
-				<div 
+				<div
 					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
 					onClick={(e) => {
 						if (e.target === e.currentTarget) {
@@ -951,7 +950,7 @@ export default function AssessmentsPage() {
 
 			{/* Submit Error Modal */}
 			{submitError && (
-				<div 
+				<div
 					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
 					onClick={(e) => {
 						if (e.target === e.currentTarget) {
