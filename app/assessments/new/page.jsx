@@ -266,6 +266,7 @@ export default function CreateAssessmentPage() {
 					timer: config.timer ? parseInt(config.timer) : null,
 					attempts: config.attempts ? parseInt(config.attempts) : null,
 					passingPercentage: config.passingPercentage ? parseInt(config.passingPercentage) : 40,
+					allowLateSubmission: config.allowLateSubmission || false,
 				},
 				createdBy: auth.currentUser.uid,
 				createdAt: serverTimestamp(),
@@ -634,9 +635,6 @@ export default function CreateAssessmentPage() {
 									/>
 								</div>
 								<div>
-									<label htmlFor="passingPercentage" className="block text-sm font-medium mb-2">
-										Passing Percentage (%)
-									</label>
 									<Input
 										id="passingPercentage"
 										type="number"
@@ -645,6 +643,21 @@ export default function CreateAssessmentPage() {
 										min="0"
 										max="100"
 									/>
+								</div>
+
+								<div className="flex items-end pb-2">
+									<div className="flex items-center gap-2">
+										<input
+											type="checkbox"
+											id="allowLateSubmission"
+											checked={config.allowLateSubmission || false}
+											onChange={(e) => setConfig({ ...config, allowLateSubmission: e.target.checked })}
+											className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+										/>
+										<label htmlFor="allowLateSubmission" className="text-sm font-medium">
+											Allow Late Submissions
+										</label>
+									</div>
 								</div>
 							</div>
 						</CardContent>

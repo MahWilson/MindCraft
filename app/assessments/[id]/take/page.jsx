@@ -74,17 +74,17 @@ export default function TakeAssessmentPage() {
 		}
 	}, [assessment, timeRemaining]);
 
-// Prevent body scroll when a modal is open
-useEffect(() => {
-	if (confirmSubmitModal || resultModal) {
-		document.body.style.overflow = 'hidden';
-	} else {
-		document.body.style.overflow = 'unset';
-	}
-	return () => {
-		document.body.style.overflow = 'unset';
-	};
-}, [confirmSubmitModal, resultModal]);
+	// Prevent body scroll when a modal is open
+	useEffect(() => {
+		if (confirmSubmitModal || resultModal) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = 'unset';
+		}
+		return () => {
+			document.body.style.overflow = 'unset';
+		};
+	}, [confirmSubmitModal, resultModal]);
 
 	async function loadData() {
 		setLoading(true);
@@ -98,7 +98,7 @@ useEffect(() => {
 			}
 
 			const assessmentData = { id: assessmentDoc.id, ...assessmentDoc.data() };
-			
+
 			// Check if assessment is published
 			if (!assessmentData.published) {
 				setError('This assessment is not available');
@@ -120,8 +120,8 @@ useEffect(() => {
 			if (assessmentData.config) {
 				const now = new Date();
 				if (assessmentData.config.startDate) {
-					const startDate = assessmentData.config.startDate.toDate 
-						? assessmentData.config.startDate.toDate() 
+					const startDate = assessmentData.config.startDate.toDate
+						? assessmentData.config.startDate.toDate()
 						: new Date(assessmentData.config.startDate);
 					if (now < startDate) {
 						setError('This assessment is not available yet');
@@ -130,10 +130,11 @@ useEffect(() => {
 					}
 				}
 				if (assessmentData.config.endDate) {
-					const endDate = assessmentData.config.endDate.toDate 
-						? assessmentData.config.endDate.toDate() 
+					const endDate = assessmentData.config.endDate.toDate
+						? assessmentData.config.endDate.toDate()
 						: new Date(assessmentData.config.endDate);
-					if (now > endDate) {
+
+					if (now > endDate && !assessmentData.config.allowLateSubmission) {
 						setError('This assessment has expired');
 						setLoading(false);
 						return;
@@ -201,7 +202,7 @@ useEffect(() => {
 		if (timerIntervalRef.current) {
 			clearInterval(timerIntervalRef.current);
 		}
-	await handleSubmit(true);
+		await handleSubmit(true);
 	}
 
 	async function handleSubmit(isAutoSubmit = false) {
@@ -210,22 +211,22 @@ useEffect(() => {
 			if (assessment.questions) {
 				for (let i = 0; i < assessment.questions.length; i++) {
 					if (answers[i] === null || answers[i] === undefined || answers[i] === '') {
-					setConfirmSubmitModal({
-						title: language === 'bm' ? 'Hantar penilaian?' : 'Submit assessment?',
-						message: language === 'bm' 
-							? 'Anda mempunyai soalan yang belum dijawab. Hantar juga?'
-							: 'You have unanswered questions. Submit anyway?',
-					});
-					return;
+						setConfirmSubmitModal({
+							title: language === 'bm' ? 'Hantar penilaian?' : 'Submit assessment?',
+							message: language === 'bm'
+								? 'Anda mempunyai soalan yang belum dijawab. Hantar juga?'
+								: 'You have unanswered questions. Submit anyway?',
+						});
+						return;
 					}
 				}
 			}
 		}
 
-	await performSubmission(isAutoSubmit);
-}
+		await performSubmission(isAutoSubmit);
+	}
 
-async function performSubmission(isAutoSubmit = false) {
+	async function performSubmission(isAutoSubmit = false) {
 		setSubmitting(true);
 		setError('');
 
@@ -243,13 +244,13 @@ async function performSubmission(isAutoSubmit = false) {
 				assessment.questions.forEach((question, idx) => {
 					totalPoints += question.points || 1;
 					const studentAnswer = answers[idx];
-					
+
 					if (question.type === 'mcq') {
 						if (studentAnswer === question.correctAnswer) {
 							score += question.points || 1;
 						}
 					}
-					
+
 					gradedAnswers[idx] = {
 						question: question.question,
 						studentAnswer: studentAnswer,
@@ -259,6 +260,8 @@ async function performSubmission(isAutoSubmit = false) {
 					};
 				});
 			}
+
+			const isLate = assessment.config?.endDate && new Date() > (assessment.config.endDate.toDate ? assessment.config.endDate.toDate() : new Date(assessment.config.endDate));
 
 			const submissionData = {
 				assessmentId,
@@ -270,6 +273,7 @@ async function performSubmission(isAutoSubmit = false) {
 				submittedAt: serverTimestamp(),
 				timeRemaining: timeRemaining,
 				isAutoSubmit,
+				isLate,
 			};
 
 			await addDoc(collection(db, 'submission'), submissionData);
@@ -280,7 +284,7 @@ async function performSubmission(isAutoSubmit = false) {
 
 			setResultModal({
 				title: language === 'bm' ? 'Penilaian telah dihantar' : 'Assessment submitted',
-				message: language === 'bm' 
+				message: language === 'bm'
 					? `Markah anda: ${score}/${totalPoints}${isAutoSubmit ? ' (dihantar secara automatik)' : ''}`
 					: `Your score: ${score}/${totalPoints}${isAutoSubmit ? ' (submitted automatically)' : ''}`,
 				isError: false,
@@ -291,21 +295,21 @@ async function performSubmission(isAutoSubmit = false) {
 			});
 		} catch (err) {
 			console.error('Error submitting assessment:', err);
-	const msg = 'Failed to submit assessment: ' + (err.message || 'Unknown error');
-	setError(msg);
-	setResultModal({
-		title: 'Submission failed',
-		message: msg,
-		isError: true,
-	});
-	setSubmitting(false);
+			const msg = 'Failed to submit assessment: ' + (err.message || 'Unknown error');
+			setError(msg);
+			setResultModal({
+				title: 'Submission failed',
+				message: msg,
+				isError: true,
+			});
+			setSubmitting(false);
 		}
 	}
 
-function closeResultModal() {
-	setResultModal(null);
-	router.push('/assessments');
-}
+	function closeResultModal() {
+		setResultModal(null);
+		router.push('/assessments');
+	}
 
 	if (loading) {
 		return (
@@ -365,240 +369,237 @@ function closeResultModal() {
 
 	return (
 		<>
-		<div className="space-y-8">
-			{/* Header */}
-			<div>
-				<Link href="/assessments">
-					<Button variant="ghost" className="mb-4" title="Back to Assessments">
-						<ArrowLeft className="h-4 w-4 mr-2" />
-						Back to Assessments
-					</Button>
-				</Link>
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-h1 text-neutralDark mb-2">{assessment?.title}</h1>
-						<p className="text-body text-muted-foreground">
-							{assessment?.description && (
-								<span dangerouslySetInnerHTML={{ __html: assessment.description }} />
-							)}
-						</p>
-					</div>
-					{timeRemaining !== null && (
-						<div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
-							<Clock className="h-5 w-5 text-primary" />
-							<span className="text-h3 font-mono text-primary">
-								{formatTime(timeRemaining)}
-							</span>
-						</div>
-					)}
-				</div>
-			</div>
-
-			{/* Questions */}
-			{assessment?.questions && assessment.questions.length > 0 && (
-				<div className="space-y-6">
-					{assessment.questions.map((question, index) => (
-						<Card key={index}>
-							<CardHeader>
-								<CardTitle className="text-lg">
-									Question {index + 1} {question.points && `(${question.points} point${question.points !== 1 ? 's' : ''})`}
-								</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<p className="text-body font-medium">{question.question}</p>
-
-								{question.type === 'mcq' ? (
-									<div className="space-y-2">
-										{question.options && question.options.map((option, optIndex) => (
-											<label
-												key={optIndex}
-												className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-neutralLight transition-colors"
-											>
-												<input
-													type="radio"
-													name={`question_${index}`}
-													value={optIndex}
-													checked={answers[index] === optIndex}
-													onChange={(e) => handleAnswerChange(index, parseInt(e.target.value))}
-													className="w-5 h-5"
-												/>
-												<span className="flex-1">{option}</span>
-											</label>
-										))}
-									</div>
-								) : (
-									<Input
-										value={answers[index] || ''}
-										onChange={(e) => handleAnswerChange(index, e.target.value)}
-										placeholder="Enter your answer here..."
-										className="w-full"
-									/>
-								)}
-							</CardContent>
-						</Card>
-					))}
-				</div>
-			)}
-
-			{/* Submit Section */}
-			<Card>
-				<CardContent className="py-6">
+			<div className="space-y-8">
+				{/* Header */}
+				<div>
+					<Link href="/assessments">
+						<Button variant="ghost" className="mb-4" title="Back to Assessments">
+							<ArrowLeft className="h-4 w-4 mr-2" />
+							Back to Assessments
+						</Button>
+					</Link>
 					<div className="flex items-center justify-between">
 						<div>
+							<h1 className="text-h1 text-neutralDark mb-2">{assessment?.title}</h1>
 							<p className="text-body text-muted-foreground">
-								{assessment?.questions?.length || 0} question(s) total
+								{assessment?.description && (
+									<span dangerouslySetInnerHTML={{ __html: assessment.description }} />
+								)}
 							</p>
-							{attempts.length > 0 && (
-								<p className="text-sm text-muted-foreground mt-1">
-									Attempt {attempts.length + 1} of {assessment?.config?.attempts || 'unlimited'}
-								</p>
-							)}
 						</div>
-						<Button
-							onClick={() => handleSubmit(false)}
-							disabled={submitting}
-							className="min-w-[150px]"
-							title="Submit your assessment"
-						>
-							{submitting ? (
-								<>
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Submitting...
-								</>
-							) : (
-								<>
-									<CheckCircle className="h-4 w-4 mr-2" />
-									Submit Assessment
-								</>
-							)}
-						</Button>
+						{timeRemaining !== null && (
+							<div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
+								<Clock className="h-5 w-5 text-primary" />
+								<span className="text-h3 font-mono text-primary">
+									{formatTime(timeRemaining)}
+								</span>
+							</div>
+						)}
 					</div>
-				</CardContent>
-			</Card>
+				</div>
 
-			{error && (
-				<Card className="border-destructive bg-destructive/5">
-					<CardContent className="py-4">
-						<p className="text-sm text-destructive">{error}</p>
-					</CardContent>
-				</Card>
-			)}
-		</div>
-		
-		{/* Confirm Submit Modal */}
-		{confirmSubmitModal && (
-			<div
-				className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-				onClick={(e) => {
-					if (e.target === e.currentTarget) setConfirmSubmitModal(null);
-				}}
-				onKeyDown={(e) => {
-					if (e.key === 'Escape') setConfirmSubmitModal(null);
-				}}
-				tabIndex={-1}
-			>
-				<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-					<CardHeader>
-						<CardTitle className="text-h3 flex items-center gap-2">
-							<Info className="h-5 w-5 text-warning" />
-							{confirmSubmitModal.title}
-						</CardTitle>
-						<CardDescription>{confirmSubmitModal.message}</CardDescription>
-					</CardHeader>
-					<CardContent className="flex gap-3 justify-end">
-						<Button variant="outline" onClick={() => setConfirmSubmitModal(null)}>
-							{language === 'bm' ? 'Batal' : 'Cancel'}
-						</Button>
-						<Button
-							onClick={() => {
-								setConfirmSubmitModal(null);
-								performSubmission(false);
-							}}
-						>
-							{language === 'bm' ? 'Hantar juga' : 'Submit anyway'}
-						</Button>
-					</CardContent>
-				</Card>
-			</div>
-		)}
+				{/* Questions */}
+				{assessment?.questions && assessment.questions.length > 0 && (
+					<div className="space-y-6">
+						{assessment.questions.map((question, index) => (
+							<Card key={index}>
+								<CardHeader>
+									<CardTitle className="text-lg">
+										Question {index + 1} {question.points && `(${question.points} point${question.points !== 1 ? 's' : ''})`}
+									</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<p className="text-body font-medium">{question.question}</p>
 
-		{/* Result Modal */}
-		{resultModal && (
-			<div
-				className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-				onClick={(e) => {
-					if (e.target === e.currentTarget) closeResultModal();
-				}}
-				onKeyDown={(e) => {
-					if (e.key === 'Escape') closeResultModal();
-				}}
-				tabIndex={-1}
-			>
-				<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-					<CardHeader>
-						<CardTitle className={`text-h3 flex items-center gap-2 ${resultModal.isError ? 'text-destructive' : 'text-success'}`}>
-							{resultModal.isError ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
-							{resultModal.title}
-						</CardTitle>
-						<CardDescription>{resultModal.message}</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						{!resultModal.isError && resultModal.percentage !== undefined && (
-							<div className={`p-4 rounded-lg border-2 ${
-								resultModal.passed 
-									? 'bg-success/10 border-success/30' 
-									: 'bg-destructive/10 border-destructive/30'
-							}`}>
-								<div className="flex items-center justify-between mb-2">
-									<div className="flex items-center gap-2">
-										{resultModal.passed ? (
-											<CheckCircle className="h-6 w-6 text-success" />
-										) : (
-											<XCircle className="h-6 w-6 text-destructive" />
-										)}
-										<span className={`text-lg font-semibold ${
-											resultModal.passed ? 'text-success' : 'text-destructive'
-										}`}>
-											{resultModal.passed 
-												? (language === 'bm' ? 'LULUS' : 'PASS')
-												: (language === 'bm' ? 'GAGAL' : 'FAIL')
-											}
-										</span>
-									</div>
-									<span className={`text-lg font-bold ${
-										resultModal.passed ? 'text-success' : 'text-destructive'
-									}`}>
-										{resultModal.percentage.toFixed(1)}%
-									</span>
-								</div>
-								<p className="text-sm text-muted-foreground">
-									{language === 'bm' 
-										? `Markah: ${resultModal.score}/${resultModal.totalPoints} (${resultModal.percentage.toFixed(1)}%)`
-										: `Score: ${resultModal.score}/${resultModal.totalPoints} (${resultModal.percentage.toFixed(1)}%)`
-									}
+									{question.type === 'mcq' ? (
+										<div className="space-y-2">
+											{question.options && question.options.map((option, optIndex) => (
+												<label
+													key={optIndex}
+													className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-neutralLight transition-colors"
+												>
+													<input
+														type="radio"
+														name={`question_${index}`}
+														value={optIndex}
+														checked={answers[index] === optIndex}
+														onChange={(e) => handleAnswerChange(index, parseInt(e.target.value))}
+														className="w-5 h-5"
+													/>
+													<span className="flex-1">{option}</span>
+												</label>
+											))}
+										</div>
+									) : (
+										<Input
+											value={answers[index] || ''}
+											onChange={(e) => handleAnswerChange(index, e.target.value)}
+											placeholder="Enter your answer here..."
+											className="w-full"
+										/>
+									)}
+								</CardContent>
+							</Card>
+						))}
+					</div>
+				)}
+
+				{/* Submit Section */}
+				<Card>
+					<CardContent className="py-6">
+						<div className="flex items-center justify-between">
+							<div>
+								<p className="text-body text-muted-foreground">
+									{assessment?.questions?.length || 0} question(s) total
 								</p>
-								{!resultModal.passed && (
-									<p className="text-xs text-muted-foreground mt-2">
-										{language === 'bm' 
-											? 'Anda perlu mendapat lebih daripada 40% untuk lulus.'
-											: 'You need to score more than 40% to pass.'
-										}
+								{attempts.length > 0 && (
+									<p className="text-sm text-muted-foreground mt-1">
+										Attempt {attempts.length + 1} of {assessment?.config?.attempts || 'unlimited'}
 									</p>
 								)}
 							</div>
-						)}
-						<div className="flex justify-end">
 							<Button
-								variant={resultModal.isError ? 'destructive' : 'default'}
-								onClick={closeResultModal}
+								onClick={() => handleSubmit(false)}
+								disabled={submitting}
+								className="min-w-[150px]"
+								title="Submit your assessment"
 							>
-								{language === 'bm' ? 'OK' : 'OK'}
+								{submitting ? (
+									<>
+										<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+										Submitting...
+									</>
+								) : (
+									<>
+										<CheckCircle className="h-4 w-4 mr-2" />
+										Submit Assessment
+									</>
+								)}
 							</Button>
 						</div>
 					</CardContent>
 				</Card>
+
+				{error && (
+					<Card className="border-destructive bg-destructive/5">
+						<CardContent className="py-4">
+							<p className="text-sm text-destructive">{error}</p>
+						</CardContent>
+					</Card>
+				)}
 			</div>
-		)}
+
+			{/* Confirm Submit Modal */}
+			{confirmSubmitModal && (
+				<div
+					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+					onClick={(e) => {
+						if (e.target === e.currentTarget) setConfirmSubmitModal(null);
+					}}
+					onKeyDown={(e) => {
+						if (e.key === 'Escape') setConfirmSubmitModal(null);
+					}}
+					tabIndex={-1}
+				>
+					<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+						<CardHeader>
+							<CardTitle className="text-h3 flex items-center gap-2">
+								<Info className="h-5 w-5 text-warning" />
+								{confirmSubmitModal.title}
+							</CardTitle>
+							<CardDescription>{confirmSubmitModal.message}</CardDescription>
+						</CardHeader>
+						<CardContent className="flex gap-3 justify-end">
+							<Button variant="outline" onClick={() => setConfirmSubmitModal(null)}>
+								{language === 'bm' ? 'Batal' : 'Cancel'}
+							</Button>
+							<Button
+								onClick={() => {
+									setConfirmSubmitModal(null);
+									performSubmission(false);
+								}}
+							>
+								{language === 'bm' ? 'Hantar juga' : 'Submit anyway'}
+							</Button>
+						</CardContent>
+					</Card>
+				</div>
+			)}
+
+			{/* Result Modal */}
+			{resultModal && (
+				<div
+					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+					onClick={(e) => {
+						if (e.target === e.currentTarget) closeResultModal();
+					}}
+					onKeyDown={(e) => {
+						if (e.key === 'Escape') closeResultModal();
+					}}
+					tabIndex={-1}
+				>
+					<Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+						<CardHeader>
+							<CardTitle className={`text-h3 flex items-center gap-2 ${resultModal.isError ? 'text-destructive' : 'text-success'}`}>
+								{resultModal.isError ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+								{resultModal.title}
+							</CardTitle>
+							<CardDescription>{resultModal.message}</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							{!resultModal.isError && resultModal.percentage !== undefined && (
+								<div className={`p-4 rounded-lg border-2 ${resultModal.passed
+									? 'bg-success/10 border-success/30'
+									: 'bg-destructive/10 border-destructive/30'
+									}`}>
+									<div className="flex items-center justify-between mb-2">
+										<div className="flex items-center gap-2">
+											{resultModal.passed ? (
+												<CheckCircle className="h-6 w-6 text-success" />
+											) : (
+												<XCircle className="h-6 w-6 text-destructive" />
+											)}
+											<span className={`text-lg font-semibold ${resultModal.passed ? 'text-success' : 'text-destructive'
+												}`}>
+												{resultModal.passed
+													? (language === 'bm' ? 'LULUS' : 'PASS')
+													: (language === 'bm' ? 'GAGAL' : 'FAIL')
+												}
+											</span>
+										</div>
+										<span className={`text-lg font-bold ${resultModal.passed ? 'text-success' : 'text-destructive'
+											}`}>
+											{resultModal.percentage.toFixed(1)}%
+										</span>
+									</div>
+									<p className="text-sm text-muted-foreground">
+										{language === 'bm'
+											? `Markah: ${resultModal.score}/${resultModal.totalPoints} (${resultModal.percentage.toFixed(1)}%)`
+											: `Score: ${resultModal.score}/${resultModal.totalPoints} (${resultModal.percentage.toFixed(1)}%)`
+										}
+									</p>
+									{!resultModal.passed && (
+										<p className="text-xs text-muted-foreground mt-2">
+											{language === 'bm'
+												? 'Anda perlu mendapat lebih daripada 40% untuk lulus.'
+												: 'You need to score more than 40% to pass.'
+											}
+										</p>
+									)}
+								</div>
+							)}
+							<div className="flex justify-end">
+								<Button
+									variant={resultModal.isError ? 'destructive' : 'default'}
+									onClick={closeResultModal}
+								>
+									{language === 'bm' ? 'OK' : 'OK'}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				</div>
+			)}
 		</>
 	);
 }

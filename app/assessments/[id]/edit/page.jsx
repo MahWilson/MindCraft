@@ -132,6 +132,7 @@ export default function EditAssessmentPage() {
 					timer: configData.timer || '',
 					attempts: configData.attempts || 1,
 					passingPercentage: configData.passingPercentage !== undefined ? configData.passingPercentage : 40,
+					allowLateSubmission: configData.allowLateSubmission || false,
 				});
 			}
 		} catch (err) {
@@ -333,6 +334,7 @@ export default function EditAssessmentPage() {
 					timer: config.timer ? parseInt(config.timer) : null,
 					attempts: config.attempts ? parseInt(config.attempts) : null,
 					passingPercentage: config.passingPercentage ? parseInt(config.passingPercentage) : 40,
+					allowLateSubmission: config.allowLateSubmission || false,
 				},
 			};
 
@@ -650,8 +652,8 @@ export default function EditAssessmentPage() {
 														type="button"
 														onClick={() => updateQuestion(question.id, 'points', points)}
 														className={`px-4 py-2 rounded-md font-medium transition-all ${(question.points || 1) === points
-																? 'bg-primary text-white shadow-sm'
-																: 'bg-neutralLight text-neutralDark hover:bg-primary/10 border border-border'
+															? 'bg-primary text-white shadow-sm'
+															: 'bg-neutralLight text-neutralDark hover:bg-primary/10 border border-border'
 															}`}
 													>
 														{points}
@@ -733,9 +735,6 @@ export default function EditAssessmentPage() {
 									/>
 								</div>
 								<div>
-									<label htmlFor="passingPercentage" className="block text-sm font-medium mb-2">
-										Passing Percentage (%)
-									</label>
 									<Input
 										id="passingPercentage"
 										type="number"
@@ -744,6 +743,21 @@ export default function EditAssessmentPage() {
 										min="0"
 										max="100"
 									/>
+								</div>
+
+								<div className="flex items-end pb-2">
+									<div className="flex items-center gap-2">
+										<input
+											type="checkbox"
+											id="allowLateSubmission"
+											checked={config.allowLateSubmission || false}
+											onChange={(e) => setConfig({ ...config, allowLateSubmission: e.target.checked })}
+											className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+										/>
+										<label htmlFor="allowLateSubmission" className="text-sm font-medium">
+											Allow Late Submissions
+										</label>
+									</div>
 								</div>
 							</div>
 						</CardContent>

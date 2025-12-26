@@ -62,6 +62,20 @@ export default function SubmitAssignmentPage() {
 				return;
 			}
 
+			// Check date restrictions
+			if (assessmentData.config?.endDate) {
+				const now = new Date();
+				const endDate = assessmentData.config.endDate.toDate
+					? assessmentData.config.endDate.toDate()
+					: new Date(assessmentData.config.endDate);
+
+				if (now > endDate && !assessmentData.config.allowLateSubmission) {
+					setError('This assignment is closed');
+					setLoading(false);
+					return;
+				}
+			}
+
 			// Load existing submission if any
 			if (currentUserId) {
 				const submissionsQuery = query(
@@ -70,7 +84,7 @@ export default function SubmitAssignmentPage() {
 					where('studentId', '==', currentUserId)
 				);
 				const submissionsSnapshot = await getDocs(submissionsQuery);
-				
+
 				if (!submissionsSnapshot.empty) {
 					const existingSubmission = {
 						id: submissionsSnapshot.docs[0].id,
@@ -140,7 +154,7 @@ export default function SubmitAssignmentPage() {
 			// Upload to Firebase Storage
 			const filePath = `assignment-submissions/${assessmentId}/${fileId}_${file.name}`;
 			const fileRef = ref(storage, filePath);
-			
+
 			await uploadBytes(fileRef, file);
 			const downloadURL = await getDownloadURL(fileRef);
 
@@ -195,6 +209,7 @@ export default function SubmitAssignmentPage() {
 				status: 'submitted',
 				submittedAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
+				isLate: assessment.config?.endDate && new Date() > (assessment.config.endDate.toDate ? assessment.config.endDate.toDate() : new Date(assessment.config.endDate)),
 			};
 
 			if (submission) {
