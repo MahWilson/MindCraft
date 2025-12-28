@@ -1,5 +1,5 @@
 =========================================
-===COURSE 1: Introduction to Databases===
+COURSE 1: Introduction to Databases
 =========================================
 
 Course Title: Introduction to Databases
@@ -106,8 +106,6 @@ A Database Management System (DBMS) is software that helps you create, manage, a
 - Data backup and recovery
 - Query optimization
 - Transaction management
-
----
 
 ---
 MODULE 2: Database Design Basics
