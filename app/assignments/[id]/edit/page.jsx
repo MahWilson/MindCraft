@@ -100,8 +100,8 @@ export default function EditAssignmentPage() {
 
 			// Format deadline for datetime-local input
 			if (assignmentData.deadline) {
-				const deadlineDate = assignmentData.deadline.toDate 
-					? assignmentData.deadline.toDate() 
+				const deadlineDate = assignmentData.deadline.toDate
+					? assignmentData.deadline.toDate()
 					: new Date(assignmentData.deadline);
 				const year = deadlineDate.getFullYear();
 				const month = String(deadlineDate.getMonth() + 1).padStart(2, '0');
@@ -341,7 +341,7 @@ export default function EditAssignmentPage() {
 										Allow late submissions
 									</label>
 									<p className="text-xs text-muted-foreground mt-1">
-										{allowLateSubmissions 
+										{allowLateSubmissions
 											? 'Students can submit work after the deadline has passed'
 											: 'Toggle off to close submissions or take assignment offline'
 										}

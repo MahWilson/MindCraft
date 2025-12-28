@@ -689,8 +689,8 @@ export default function AssessmentsPage() {
 
 														return (
 															<div className={`p-2 rounded-lg border-2 ${passed
-																	? 'bg-success/10 border-success/30'
-																	: 'bg-destructive/10 border-destructive/30'
+																? 'bg-success/10 border-success/30'
+																: 'bg-destructive/10 border-destructive/30'
 																}`}>
 																<div className="flex items-center justify-between">
 																	<div className="flex items-center gap-2">
