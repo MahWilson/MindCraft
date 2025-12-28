@@ -1,6 +1,6 @@
-==========================================
-COURSE 1: Introduction to Databases
-==========================================
+=========================================
+===COURSE 1: Introduction to Databases===
+=========================================
 
 Course Title: Introduction to Databases
 Course Description: Learn the fundamentals of databases, data modeling, and how to organize information effectively. Perfect for beginners who want to understand what databases are and why they're essential in modern applications.
