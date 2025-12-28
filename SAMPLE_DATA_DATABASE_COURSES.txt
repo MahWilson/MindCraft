@@ -26,6 +26,9 @@ Data refers to raw facts and figures that have no meaning on their own. Examples
 **What is Information?**
 Information is processed data that has meaning and context. When we organize data in a meaningful way, it becomes information.
 
+The "Data to Information" Pipeline
+To help students visualize the process, you can explain that a database acts as the "processor" that turns raw facts into useful insights.
+
 **Example:**
 - Data: "John", "25", "Student"
 - Information: "John is a 25-year-old student"
