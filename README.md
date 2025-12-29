@@ -1,9 +1,11 @@
 # MindCraft
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)
-![Firebase](https://img.shields.io/badge/Firebase-Auth%20%26%20Firestore-ffca28?style=flat-square&logo=firebase)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-Main-38b2ac?style=flat-square&logo=tailwind-css)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![Next.js](https://img.shields.io/badge/Next.js-0070f3?style=flat-square&logo=next.js&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-ffca28?style=flat-square&logo=firebase&logoColor=black)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-4fb325?style=flat-square)
+
+An AI-powered learning platform designed to make programming education smarter, more interactive, and more accessible for secondary school students.
 
 An AI-powered learning platform...
 An AI-powered learning platform designed to make programming education smarter, more interactive, and more accessible for secondary school students.
