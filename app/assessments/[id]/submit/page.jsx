@@ -27,6 +27,8 @@ export default function SubmitAssignmentPage() {
 	const [currentUserId, setCurrentUserId] = useState(null);
 	const [error, setError] = useState('');
 	const [successMessage, setSuccessMessage] = useState('');
+	const [showConfirmModal, setShowConfirmModal] = useState(false);
+	const [isLocked, setIsLocked] = useState(false);
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -92,6 +94,11 @@ export default function SubmitAssignmentPage() {
 					};
 					setSubmission(existingSubmission);
 					setUploadedFiles(existingSubmission.files || []);
+
+					// Lock if submitted
+					if (existingSubmission.status === 'submitted') {
+						setIsLocked(true);
+					}
 				}
 			}
 		} catch (err) {
@@ -183,14 +190,59 @@ export default function SubmitAssignmentPage() {
 		setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
 	}
 
-	async function handleSubmit() {
+	async function handleSaveDraft() {
 		if (uploadedFiles.length === 0) {
-			alert('Please upload at least one file');
+			alert('Please upload at least one file to save a draft');
 			return;
 		}
 
 		setSubmitting(true);
 		setError('');
+
+		try {
+			const submissionData = {
+				assessmentId,
+				studentId: auth.currentUser.uid,
+				files: uploadedFiles.map(f => ({
+					name: f.name,
+					url: f.url,
+					type: f.type,
+					size: f.size,
+				})),
+				status: 'draft',
+				updatedAt: serverTimestamp(),
+			};
+
+			if (submission) {
+				await updateDoc(doc(db, 'submission', submission.id), submissionData);
+				setSubmission(prev => ({ ...prev, ...submissionData }));
+			} else {
+				const docRef = await addDoc(collection(db, 'submission'), submissionData);
+				setSubmission({ id: docRef.id, ...submissionData });
+			}
+
+			setSuccessMessage('Draft saved successfully!');
+			setTimeout(() => setSuccessMessage(''), 3000);
+		} catch (err) {
+			console.error('Error saving draft:', err);
+			setError('Failed to save draft');
+		} finally {
+			setSubmitting(false);
+		}
+	}
+
+	async function handleSubmit() {
+		if (uploadedFiles.length === 0) {
+			alert('Please upload at least one file');
+			return;
+		}
+		setShowConfirmModal(true);
+	}
+
+	async function executeSubmit() {
+		setSubmitting(true);
+		setError('');
+		setShowConfirmModal(false);
 
 		try {
 			if (!auth.currentUser) {
@@ -215,13 +267,14 @@ export default function SubmitAssignmentPage() {
 			if (submission) {
 				// Update existing submission
 				await updateDoc(doc(db, 'submission', submission.id), submissionData);
-				setSuccessMessage('Assignment updated successfully!');
+				setSuccessMessage('Assignment submitted successfully!');
 			} else {
 				// Create new submission
 				await addDoc(collection(db, 'submission'), submissionData);
 				setSuccessMessage('Assignment submitted successfully!');
 			}
 
+			setIsLocked(true);
 			setTimeout(() => {
 				router.push('/assessments');
 			}, 2000);
@@ -297,11 +350,23 @@ export default function SubmitAssignmentPage() {
 							)}
 						</div>
 						{submission && (
-							<div className="p-3 bg-info/10 border border-info/20 rounded-lg">
-								<p className="text-sm text-info flex items-center gap-2">
-									<CheckCircle className="h-4 w-4" />
-									You have already submitted this assignment. Uploading new files will update your submission.
-								</p>
+							<div className={`p-4 rounded-lg border flex items-center gap-3 ${isLocked ? 'bg-success/5 border-success/20' : 'bg-info/5 border-info/20'
+								}`}>
+								{isLocked ? (
+									<CheckCircle className="h-5 w-5 text-success" />
+								) : (
+									<File className="h-5 w-5 text-info" />
+								)}
+								<div>
+									<p className={`text-sm font-semibold ${isLocked ? 'text-success' : 'text-info'}`}>
+										{isLocked ? 'Submission Locked' : 'Draft Saved'}
+									</p>
+									<p className="text-xs text-muted-foreground mt-0.5">
+										{isLocked
+											? 'Your assignment has been submitted and can no longer be edited.'
+											: 'You have a saved draft. Click "Submit" to finalize your submission.'}
+									</p>
+								</div>
 							</div>
 						)}
 					</CardContent>
@@ -327,9 +392,9 @@ export default function SubmitAssignmentPage() {
 
 					<Button
 						onClick={() => fileInputRef.current?.click()}
-						disabled={uploading}
+						disabled={uploading || isLocked}
 						variant="outline"
-						className="w-full"
+						className="w-full h-12 dashed border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all"
 						title="Click to select a file to upload"
 					>
 						{uploading ? (
@@ -339,8 +404,8 @@ export default function SubmitAssignmentPage() {
 							</>
 						) : (
 							<>
-								<Upload className="h-4 w-4 mr-2" />
-								Choose File
+								<Upload className="h-5 w-5 mr-3" />
+								Choose Assignment File
 							</>
 						)}
 					</Button>
@@ -376,14 +441,17 @@ export default function SubmitAssignmentPage() {
 												</p>
 											</div>
 										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => removeFile(file.id)}
-											title="Remove file"
-										>
-											<X className="h-4 w-4" />
-										</Button>
+										{!isLocked && (
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => removeFile(file.id)}
+												title="Remove file"
+												className="text-destructive hover:bg-destructive/10"
+											>
+												<X className="h-4 w-4" />
+											</Button>
+										)}
 									</div>
 								))}
 							</div>
@@ -392,31 +460,79 @@ export default function SubmitAssignmentPage() {
 				</CardContent>
 			</Card>
 
-			{/* Submit Button */}
-			<div className="flex gap-4">
-				<Button
-					onClick={handleSubmit}
-					disabled={submitting || uploadedFiles.length === 0}
-					className="flex-1"
-					title="Submit your assignment"
-				>
-					{submitting ? (
-						<>
-							<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-							{submission ? 'Updating...' : 'Submitting...'}
-						</>
-					) : (
-						<>
-							{submission ? 'Update Submission' : 'Submit Assignment'}
-						</>
-					)}
-				</Button>
-				<Link href="/assessments">
-					<Button variant="outline" title="Cancel and go back">
-						Cancel
+			{/* Action Buttons */}
+			<div className="flex flex-col sm:flex-row gap-4">
+				{!isLocked && (
+					<>
+						<Button
+							onClick={handleSaveDraft}
+							disabled={submitting || uploading || uploadedFiles.length === 0}
+							variant="outline"
+							className="flex-1 h-11"
+						>
+							Save as Draft
+						</Button>
+						<Button
+							onClick={handleSubmit}
+							disabled={submitting || uploading || uploadedFiles.length === 0}
+							className="flex-1 h-11 bg-primary hover:bg-primary/90"
+						>
+							{submitting ? (
+								<>
+									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+									Submitting...
+								</>
+							) : (
+								'Submit Assignment'
+							)}
+						</Button>
+					</>
+				)}
+				<Link href="/assessments" className={isLocked ? "w-full" : "sm:w-auto"}>
+					<Button variant="ghost" className="w-full h-11" title="Go back">
+						{isLocked ? 'Back to Assessments' : 'Cancel'}
 					</Button>
 				</Link>
 			</div>
+
+			{/* Final Submission Confirmation Modal */}
+			{showConfirmModal && (
+				<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+					<Card className="max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+						<CardHeader>
+							<CardTitle className="text-xl flex items-center gap-2">
+								<CheckCircle className="h-6 w-6 text-primary" />
+								Final Submission
+							</CardTitle>
+							<CardDescription>
+								Are you sure you want to submit your assignment? This will lock your submission and you won't be able to make further changes.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="bg-muted/50 p-4 rounded-lg">
+								<p className="text-sm font-medium">Assignment: {assessment.title}</p>
+								<p className="text-sm text-muted-foreground mt-1">Files to submit: {uploadedFiles.length}</p>
+							</div>
+							<div className="flex gap-3 justify-end">
+								<Button
+									variant="outline"
+									onClick={() => setShowConfirmModal(false)}
+									disabled={submitting}
+								>
+									Cancel
+								</Button>
+								<Button
+									onClick={executeSubmit}
+									disabled={submitting}
+									className="bg-primary hover:bg-primary/90"
+								>
+									{submitting ? 'Submitting...' : 'Yes, Submit Now'}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				</div>
+			)}
 		</div>
 	);
 }

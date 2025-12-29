@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ClipboardCheck, FileText, Code, Clock, Calendar, Upload, ArrowRight, Edit2, Trash2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Plus, File, X, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function AssessmentsPage() {
@@ -28,6 +28,8 @@ export default function AssessmentsPage() {
 	const fileInputRefs = useRef({}); // Map of assessmentId -> file input ref
 	const router = useRouter();
 	const { language } = useLanguage();
+	const searchParams = useSearchParams();
+	const typeFilter = searchParams.get('type');
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -138,6 +140,14 @@ export default function AssessmentsPage() {
 
 				setAssessments(loadedAssessments);
 			}
+			// Filter by type if specified in query params
+			if (typeFilter) {
+				if (userRole === 'student') {
+					setAssessments(prev => prev.filter(a => a.type === typeFilter));
+				} else {
+					setAssessments(prev => prev.filter(a => a.type === typeFilter));
+				}
+			}
 		} catch (err) {
 			console.error('Error loading assessments:', err);
 		} finally {
@@ -211,14 +221,38 @@ export default function AssessmentsPage() {
 
 	async function confirmDelete(assessmentId) {
 		const assessment = assessments.find(a => a.id === assessmentId);
+
+		let submissionCount = 0;
+		try {
+			const submissionsQuery = query(
+				collection(db, 'submission'),
+				where('assessmentId', '==', assessmentId)
+			);
+			const snapshot = await getDocs(submissionsQuery);
+			submissionCount = snapshot.size;
+		} catch (err) {
+			console.error('Error checking submissions:', err);
+		}
+
 		setDeleteConfirm({
 			assessmentId,
-			title: assessment?.title || (language === 'bm' ? 'Penilaian' : 'Assessment')
+			title: assessment?.title || (language === 'bm' ? 'Penilaian' : 'Assessment'),
+			submissionCount
 		});
 	}
 
 	async function handleDelete(assessmentId) {
 		try {
+			// Delete all associated submissions first
+			const submissionsQuery = query(
+				collection(db, 'submission'),
+				where('assessmentId', '==', assessmentId)
+			);
+			const submissionSnapshot = await getDocs(submissionsQuery);
+			const deletePromises = submissionSnapshot.docs.map(doc => deleteDoc(doc.ref));
+			await Promise.all(deletePromises);
+
+			// Then delete the assessment
 			await deleteDoc(doc(db, 'assessment', assessmentId));
 			setAssessments(prev => prev.filter(a => a.id !== assessmentId));
 			setDeleteConfirm(null);
@@ -569,111 +603,21 @@ export default function AssessmentsPage() {
 															</p>
 														</div>
 													)}
-													{expandedAssessment === assessment.id ? (
-														<div className="space-y-3">
-															<input
-																ref={el => fileInputRefs.current[assessment.id] = el}
-																type="file"
-																onChange={(e) => handleFileUpload(assessment.id, e)}
-																className="hidden"
-																accept=".pdf,.docx,.doc,.zip,.txt,.md,.py,.js,.java,.jpg,.jpeg,.png"
-															/>
-															<Button
-																onClick={() => fileInputRefs.current[assessment.id]?.click()}
-																variant="outline"
-																size="sm"
-																className="w-full"
-																disabled={uploadingFiles[assessment.id]?.some(f => f.uploading)}
-															>
-																{uploadingFiles[assessment.id]?.some(f => f.uploading) ? (
-																	<>
-																		<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-																		{language === 'bm' ? 'Memuat naik...' : 'Uploading...'}
-																	</>
-																) : (
-																	<>
-																		<Upload className="h-4 w-4 mr-2" />
-																		{language === 'bm' ? 'Pilih Fail' : 'Choose File'}
-																	</>
-																)}
-															</Button>
-															{(uploadingFiles[assessment.id] || []).length > 0 && (
-																<div className="space-y-1.5">
-																	{(uploadingFiles[assessment.id] || []).map((file) => (
-																		<div
-																			key={file.id}
-																			className="flex items-center justify-between p-2 border rounded text-xs"
-																		>
-																			<div className="flex items-center gap-2 flex-1 min-w-0">
-																				<File className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-																				<span className="truncate">{file.name}</span>
-																				{file.uploading && (
-																					<Loader2 className="h-3 w-3 animate-spin text-primary flex-shrink-0" />
-																				)}
-																			</div>
-																			<Button
-																				variant="ghost"
-																				size="sm"
-																				onClick={() => removeFile(assessment.id, file.id)}
-																				className="h-6 w-6 p-0 flex-shrink-0"
-																				disabled={file.uploading}
-																			>
-																				<X className="h-3 w-3" />
-																			</Button>
-																		</div>
-																	))}
-																</div>
+													<Link href={`/assessments/${assessment.id}/submit`} className="block w-full">
+														<Button variant="default" className="w-full">
+															{submissions[assessment.id] ? (
+																<>
+																	<Eye className="h-4 w-4 mr-2" />
+																	{language === 'bm' ? 'Lihat / Kemas Kini' : 'View / Update'}
+																</>
+															) : (
+																<>
+																	<Upload className="h-4 w-4 mr-2" />
+																	{language === 'bm' ? 'Hantar Tugasan' : 'Submit Assignment'}
+																</>
 															)}
-															<div className="flex gap-2">
-																<Button
-																	onClick={() => confirmSubmit(assessment.id)}
-																	disabled={submitting[assessment.id] || (uploadingFiles[assessment.id] || []).length === 0 || (uploadingFiles[assessment.id] || []).some(f => f.uploading)}
-																	size="sm"
-																	className="flex-1"
-																>
-																	{submitting[assessment.id] ? (
-																		<>
-																			<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-																			{language === 'bm' ? 'Menghantar...' : 'Submitting...'}
-																		</>
-																	) : (
-																		<>
-																			<Upload className="h-4 w-4 mr-2" />
-																			{language === 'bm' ? 'Hantar' : 'Submit'}
-																		</>
-																	)}
-																</Button>
-																<Button
-																	variant="outline"
-																	size="sm"
-																	onClick={() => {
-																		setExpandedAssessment(null);
-																		setUploadingFiles(prev => ({ ...prev, [assessment.id]: [] }));
-																	}}
-																>
-																	{language === 'bm' ? 'Batal' : 'Cancel'}
-																</Button>
-															</div>
-														</div>
-													) : (
-														<Button
-															variant="default"
-															className="w-full"
-															onClick={() => {
-																setExpandedAssessment(assessment.id);
-																// Load existing files if submission exists
-																if (submissions[assessment.id] && submissions[assessment.id].files) {
-																	setUploadingFiles(prev => ({
-																		...prev,
-																		[assessment.id]: submissions[assessment.id].files
-																	}));
-																}
-															}}
-														>
-															<Upload className="h-5 w-5 mr-2" />
-															{language === 'bm' ? 'Hantar Tugasan' : 'Submit Assignment'}
 														</Button>
-													)}
+													</Link>
 												</div>
 											) : (
 												<div className="w-full space-y-3">
@@ -689,8 +633,8 @@ export default function AssessmentsPage() {
 
 														return (
 															<div className={`p-2 rounded-lg border-2 ${passed
-																	? 'bg-success/10 border-success/30'
-																	: 'bg-destructive/10 border-destructive/30'
+																? 'bg-success/10 border-success/30'
+																: 'bg-destructive/10 border-destructive/30'
 																}`}>
 																<div className="flex items-center justify-between">
 																	<div className="flex items-center gap-2">
@@ -731,6 +675,12 @@ export default function AssessmentsPage() {
 													<Button variant="outline" className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/40" size="sm" title={language === 'bm' ? 'Edit Penilaian' : 'Edit Assessment'}>
 														<Edit2 className="h-5 w-5 mr-2 text-primary" />
 														{language === 'bm' ? 'Edit' : 'Edit'}
+													</Button>
+												</Link>
+												<Link href={`/assessments/${assessment.id}/submissions`} className="flex-1 min-w-[100px]">
+													<Button variant="outline" className="w-full border-info/20 hover:bg-info/10 hover:border-info/40" size="sm" title={language === 'bm' ? 'Lihat Penghantaran' : 'View Submissions'}>
+														<FileText className="h-5 w-5 mr-2 text-info" />
+														{language === 'bm' ? 'Penghantaran' : 'Submissions'}
 													</Button>
 												</Link>
 												<Button
@@ -809,6 +759,24 @@ export default function AssessmentsPage() {
 								<p className="text-sm font-medium text-destructive">
 									{language === 'bm' ? 'Penilaian:' : 'Assessment:'} {deleteConfirm.title}
 								</p>
+								{deleteConfirm.submissionCount > 0 && (
+									<div className="mt-2 text-xs bg-white/50 p-2 rounded">
+										<p className="font-bold flex items-center gap-1">
+											<AlertCircle className="h-3 w-3" />
+											{language === 'bm' ? 'AMARAN:' : 'WARNING:'}
+										</p>
+										<p>
+											{language === 'bm'
+												? `Terdapat ${deleteConfirm.submissionCount} penghantaran pelajar.`
+												: `There are ${deleteConfirm.submissionCount} student submissions.`}
+										</p>
+										<p className="mt-1">
+											{language === 'bm'
+												? 'Memadam penilaian ini akan menghapus semua data dan penghantaran pelajar secara kekal.'
+												: 'Deleting this assessment will permanently remove all associated student data and submissions.'}
+										</p>
+									</div>
+								)}
 							</div>
 							<div className="flex gap-3 justify-end">
 								<Button

@@ -46,6 +46,7 @@ function getNavItems(role) {
 			{ href: '/courses/explore', label: 'Explore Courses' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
+			{ href: '/assessments?type=assignment', label: 'Assignments' },
 			{ href: '/progress', label: 'Progress' },
 			{ href: '/forum', label: 'Forum' },
 			{ href: '/ai/coding-help', label: 'Coding Help' },
@@ -71,12 +72,12 @@ export default async function RootLayout({ children }) {
 					<div className="flex min-h-screen">
 						{/* Sidebar - in normal flow, takes up space */}
 						<Sidebar role={role} navItems={navItems} />
-						
+
 						{/* Main content area */}
 						<div className="flex-1 flex flex-col min-w-0">
 							{/* Header - spans rest of width */}
 							<Header role={role} />
-							
+
 							{/* Main content */}
 							<main className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">{children}</main>
 						</div>

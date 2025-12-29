@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Save, Loader2, Sparkles, Plus, X, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/app/components/RichTextEditor';
 
 export default function CreateAssessmentPage() {
@@ -645,18 +646,22 @@ export default function CreateAssessmentPage() {
 									/>
 								</div>
 
-								<div className="flex items-end pb-2">
-									<div className="flex items-center gap-2">
-										<input
-											type="checkbox"
+								<div className="col-span-2 mt-2">
+									<div className="flex items-center justify-between p-4 border border-border rounded-lg bg-neutral-50/50">
+										<div className="space-y-0.5">
+											<label htmlFor="allowLateSubmission" className="text-base font-medium text-neutralDark cursor-pointer">
+												Allow Late Submissions
+											</label>
+											<p className="text-sm text-muted-foreground">
+												If enabled, students can submit answers after the deadline (marked as late)
+											</p>
+										</div>
+										<Switch
 											id="allowLateSubmission"
 											checked={config.allowLateSubmission || false}
-											onChange={(e) => setConfig({ ...config, allowLateSubmission: e.target.checked })}
-											className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+											onCheckedChange={(checked) => setConfig({ ...config, allowLateSubmission: checked })}
+											className="data-[state=checked]:bg-primary scale-125"
 										/>
-										<label htmlFor="allowLateSubmission" className="text-sm font-medium">
-											Allow Late Submissions
-										</label>
 									</div>
 								</div>
 							</div>

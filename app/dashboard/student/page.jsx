@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BookOpen, ClipboardCheck, TrendingUp, Brain, ArrowRight } from 'lucide-react';
+import { BookOpen, ClipboardCheck, TrendingUp, Brain, ArrowRight, FileText } from 'lucide-react';
 import { Metric, Flex, Text, ProgressBar } from '@tremor/react';
 
 export default function StudentDashboard() {
@@ -98,6 +98,28 @@ export default function StudentDashboard() {
 						</CardHeader>
 						<CardContent>
 							<Link href="/assessments">
+								<Button variant="ghost" className="w-full justify-between group">
+									View
+									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+								</Button>
+							</Link>
+						</CardContent>
+					</Card>
+
+					<Card className="card-hover">
+						<CardHeader>
+							<Flex justifyContent="start" className="gap-3">
+								<div className="p-2 bg-primary/10 rounded-lg">
+									<FileText className="h-6 w-6 text-primary" />
+								</div>
+								<div>
+									<CardTitle>Assignments</CardTitle>
+									<CardDescription>View assignments</CardDescription>
+								</div>
+							</Flex>
+						</CardHeader>
+						<CardContent>
+							<Link href="/assignments">
 								<Button variant="ghost" className="w-full justify-between group">
 									View
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
