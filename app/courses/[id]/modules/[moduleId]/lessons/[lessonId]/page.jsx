@@ -8,11 +8,10 @@ import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, BookOpen, Download, FileText, File, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Download, FileText, File, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function LessonPage() {
 	const params = useParams();
@@ -35,118 +34,15 @@ export default function LessonPage() {
 	const [user, setUser] = useState(null);
 	const [downloadStatus, setDownloadStatus] = useState({});
 	const [downloadMessage, setDownloadMessage] = useState('');
-	// State for lesson completion
-	const [isCompleted, setIsCompleted] = useState(false);
-	const [isEnrolled, setIsEnrolled] = useState(false);
-	const [userRole, setUserRole] = useState(null);
-	const [completing, setCompleting] = useState(false);
-	const [progress, setProgress] = useState(null);
-	const { language } = useLanguage();
-
-	// Translations
-	const translations = {
-		en: {
-			loading: 'Loading lesson...',
-			notFound: 'Lesson not found',
-			courses: 'Courses',
-			backToCourse: 'Back to Course',
-			noContent: 'No content available for this lesson yet.',
-			lessonMaterials: 'Lesson materials',
-			filesPrivate: 'Files stay private to signed-in students.',
-			noFiles: 'No files shared yet.',
-			lessonFile: 'Lesson file',
-			checking: 'Checking...',
-			download: 'Download',
-			signInToDownload: 'Sign in to download.',
-			checkedAndDownloaded: 'Checked and downloaded.',
-			downloadFailed: 'Download failed, try again.',
-			previousLesson: 'Previous Lesson',
-			nextLesson: 'Next Lesson',
-			completeModule: 'Complete Module',
-			markAsComplete: 'Mark as Complete',
-			markedAsComplete: 'Marked as Complete',
-			marking: 'Marking...',
-			unmark: 'Mark as Incomplete',
-			enrollFirst: 'Enroll in course to track progress',
-			completed: 'Completed',
-			progress: 'Progress',
-		},
-		bm: {
-			loading: 'Memuatkan pelajaran...',
-			notFound: 'Pelajaran tidak dijumpai',
-			courses: 'Kursus',
-			backToCourse: 'Kembali ke Kursus',
-			noContent: 'Tiada kandungan tersedia untuk pelajaran ini lagi.',
-			lessonMaterials: 'Bahan pelajaran',
-			filesPrivate: 'Fail kekal peribadi untuk pelajar yang telah mendaftar masuk.',
-			noFiles: 'Tiada fail dikongsi lagi.',
-			lessonFile: 'Fail pelajaran',
-			checking: 'Menyemak...',
-			download: 'Muat turun',
-			signInToDownload: 'Daftar masuk untuk muat turun.',
-			checkedAndDownloaded: 'Disemak dan dimuat turun.',
-			downloadFailed: 'Muat turun gagal, cuba lagi.',
-			previousLesson: 'Pelajaran Sebelumnya',
-			nextLesson: 'Pelajaran Seterusnya',
-			completeModule: 'Lengkapkan Modul',
-			markAsComplete: 'Tandakan sebagai Selesai',
-			markedAsComplete: 'Ditandakan sebagai Selesai',
-			marking: 'Menandakan...',
-			unmark: 'Tandakan sebagai Tidak Selesai',
-			enrollFirst: 'Daftar dalam kursus untuk menjejaki kemajuan',
-			completed: 'Selesai',
-			progress: 'Kemajuan',
-		},
-	};
-
-	const t = translations[language] || translations.en;
 
 	useEffect(() => {
-		// Track signed-in user for material downloads and check enrollment
-		const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+		// Track signed-in user for material downloads
+		const unsubscribe = onAuthStateChanged(auth, currentUser => {
 			setUser(currentUser);
-			
-			if (currentUser && courseId && lessonId) {
-				// Get user role
-				try {
-					const userDoc = await getDoc(doc(db, 'user', currentUser.uid));
-					if (userDoc.exists()) {
-						const role = userDoc.data().role;
-						setUserRole(role);
-						
-						// Check enrollment and completion status for students
-						if (role === 'student') {
-							checkEnrollmentAndCompletion(currentUser.uid);
-						}
-					}
-				} catch (err) {
-					console.error('Error loading user data:', err);
-				}
-			}
 		});
 
 		return () => unsubscribe();
-	}, [courseId, lessonId]);
-
-	async function checkEnrollmentAndCompletion(userId) {
-		try {
-			const response = await fetch(`/api/courses/${courseId}/lessons/${lessonId}/complete?userId=${userId}`);
-			const data = await response.json();
-			
-			if (data.error) {
-				console.error('Error checking completion:', data.error);
-				return;
-			}
-			
-			setIsEnrolled(data.enrolled || false);
-			setIsCompleted(data.completed || false);
-			if (data.progress) {
-				setProgress(data.progress);
-			}
-		} catch (err) {
-			console.error('Error checking enrollment and completion:', err);
-		}
-	}
+	}, []);
 
 	useEffect(() => {
 		async function loadLesson() {
@@ -176,6 +72,7 @@ export default function LessonPage() {
 							setAllLessons(lessonsData.lessons);
 							const index = lessonsData.lessons.findIndex(l => l.id === lessonId);
 							setCurrentLessonIndex(index);
+							
 						}
 					}
 				}
@@ -405,46 +302,10 @@ export default function LessonPage() {
 		}
 	}
 
-	async function handleMarkComplete() {
-		if (!user || !isEnrolled) {
-			return;
-		}
-
-		setCompleting(true);
-		try {
-			const response = await fetch(`/api/courses/${courseId}/lessons/${lessonId}/complete`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					userId: user.uid,
-					role: userRole,
-				}),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || 'Failed to update completion status');
-			}
-
-			setIsCompleted(data.completed);
-			if (data.progress) {
-				setProgress(data.progress);
-			}
-		} catch (err) {
-			console.error('Error marking lesson as complete:', err);
-			alert(err.message || 'Failed to update completion status');
-		} finally {
-			setCompleting(false);
-		}
-	}
-
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
-				<p className="text-body text-muted-foreground">{t.loading}</p>
+				<p className="text-body text-muted-foreground">Loading lesson...</p>
 			</div>
 		);
 	}
@@ -453,7 +314,7 @@ export default function LessonPage() {
 		return (
 			<Card className="border-error bg-error/5">
 				<CardContent className="pt-6">
-					<p className="text-body text-error">{error || t.notFound}</p>
+					<p className="text-body text-error">{error || 'Lesson not found'}</p>
 				</CardContent>
 			</Card>
 		);
@@ -464,7 +325,7 @@ export default function LessonPage() {
 			{/* Breadcrumb Navigation */}
 			<div className="flex items-center gap-2 text-caption text-muted-foreground">
 				<Link href="/courses" className="hover:text-neutralDark transition-colors">
-					{t.courses}
+					Courses
 				</Link>
 				<span>/</span>
 				{course && (
@@ -483,26 +344,6 @@ export default function LessonPage() {
 				)}
 				<span className="text-neutralDark">{lesson.title}</span>
 			</div>
-
-			{/* Progress Indicator for Students */}
-			{userRole === 'student' && isEnrolled && progress && (
-				<Card className="bg-primary/5 border-primary/20">
-					<CardContent className="pt-4">
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-3">
-								<div className="flex items-center gap-2">
-									<span className="text-caption text-muted-foreground">{t.progress}:</span>
-									<span className="text-body font-semibold text-primary">{progress.overallProgress}%</span>
-								</div>
-								<div className="h-4 w-px bg-border"></div>
-								<div className="text-caption text-muted-foreground">
-									{progress.completedLessons?.length || 0} {language === 'bm' ? 'pelajaran selesai' : 'lessons completed'}
-								</div>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-			)}
 
 			{/* Lesson Content */}
 			<Card>
@@ -554,7 +395,7 @@ export default function LessonPage() {
 							<Link href={`/courses/${courseId}`}>
 								<Button variant="ghost" size="sm">
 									<ArrowLeft className="h-4 w-4 mr-2" />
-									{t.backToCourse}
+									Back to Course
 								</Button>
 							</Link>
 						</div>
@@ -568,71 +409,10 @@ export default function LessonPage() {
 							className="text-body text-neutralDark lesson-content"
 						/>
 					) : (
-						<p className="text-body text-muted-foreground">{t.noContent}</p>
+						<p className="text-body text-muted-foreground">No content available for this lesson yet.</p>
 					)}
 				</CardContent>
 			</Card>
-
-			{/* Mark as Complete Button (for enrolled students only) */}
-			{userRole === 'student' && (
-				<Card className={isEnrolled ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted/40'}>
-					<CardContent className="pt-6">
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-3">
-								{isCompleted ? (
-									<CheckCircle2 className="h-6 w-6 text-success" />
-								) : (
-									<div className="h-6 w-6 rounded-full border-2 border-muted-foreground"></div>
-								)}
-								<div>
-									<p className="text-body font-medium text-neutralDark">
-										{isCompleted ? t.markedAsComplete : t.markAsComplete}
-									</p>
-									{!isEnrolled && (
-										<p className="text-caption text-muted-foreground mt-1">{t.enrollFirst}</p>
-									)}
-									{isEnrolled && progress && (
-										<p className="text-caption text-muted-foreground mt-1">
-											{progress.completedLessons?.length || 0} {language === 'bm' ? 'daripada' : 'of'} {progress.completedLessons?.length + (isCompleted ? 0 : 1)} {language === 'bm' ? 'pelajaran' : 'lessons'} {language === 'bm' ? 'selesai' : 'completed'}
-										</p>
-									)}
-								</div>
-							</div>
-							{isEnrolled ? (
-								<Button
-									onClick={handleMarkComplete}
-									disabled={completing}
-									variant={isCompleted ? 'outline' : 'default'}
-									className={isCompleted ? 'border-success text-success hover:bg-success/10' : ''}
-								>
-									{completing ? (
-										<>
-											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-											{t.marking}
-										</>
-									) : isCompleted ? (
-										<>
-											<CheckCircle2 className="h-4 w-4 mr-2" />
-											{t.completed}
-										</>
-									) : (
-										<>
-											<CheckCircle2 className="h-4 w-4 mr-2" />
-											{t.markAsComplete}
-										</>
-									)}
-								</Button>
-							) : (
-								<Link href={`/courses/${courseId}`}>
-									<Button variant="outline">
-										{t.enrollFirst}
-									</Button>
-								</Link>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-			)}
 
 			{/* Style for lesson content */}
 			<style jsx global>{`
@@ -789,11 +569,11 @@ export default function LessonPage() {
 				<CardHeader className="flex flex-col gap-1">
 					<CardTitle className="text-h4 flex items-center gap-2">
 						<Download className="h-5 w-5" />
-						{t.lessonMaterials}
+						Lesson materials
 					</CardTitle>
 					<p className="text-caption text-muted-foreground flex items-center gap-1">
 						<ShieldCheck className="h-4 w-4" />
-						{t.filesPrivate}
+						Files stay private to signed-in students.
 					</p>
 					{downloadMessage && (
 						<p className="text-caption text-emerald-600">{downloadMessage}</p>
@@ -807,18 +587,18 @@ export default function LessonPage() {
 								className="flex items-center justify-between rounded-md border border-border bg-muted/40 p-3"
 							>
 								<div className="space-y-1">
-									<p className="text-body font-medium text-neutralDark">{material.name || t.lessonFile}</p>
+									<p className="text-body font-medium text-neutralDark">{material.name || 'Lesson file'}</p>
 									<p className="text-caption text-muted-foreground">
 										{material.type || 'file'} {material.size ? `• ${formatFileSize(material.size)}` : ''}
 									</p>
 									{downloadStatus[material.id] === 'done' && (
-										<p className="text-caption text-emerald-600">{t.checkedAndDownloaded}</p>
+										<p className="text-caption text-emerald-600">Checked and downloaded.</p>
 									)}
 									{downloadStatus[material.id] === 'error' && (
-										<p className="text-caption text-error">{t.downloadFailed}</p>
+										<p className="text-caption text-error">Download failed, try again.</p>
 									)}
 									{!user && (
-										<p className="text-caption text-amber-600">{t.signInToDownload}</p>
+										<p className="text-caption text-amber-600">Sign in to download.</p>
 									)}
 								</div>
 								<Button
@@ -826,12 +606,12 @@ export default function LessonPage() {
 									onClick={() => handleDownload(material)}
 									disabled={!user || downloadStatus[material.id] === 'checking'}
 								>
-									{downloadStatus[material.id] === 'checking' ? t.checking : t.download}
+									{downloadStatus[material.id] === 'checking' ? 'Checking...' : 'Download'}
 								</Button>
 							</div>
 						))
 					) : (
-						<p className="text-body text-muted-foreground">{t.noFiles}</p>
+						<p className="text-body text-muted-foreground">No files shared yet.</p>
 					)}
 				</CardContent>
 			</Card>
@@ -842,7 +622,7 @@ export default function LessonPage() {
 					<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${prevLesson.id}`}>
 						<Button variant="outline">
 							<ArrowLeft className="h-4 w-4 mr-2" />
-							{t.previousLesson}
+							Previous Lesson
 						</Button>
 					</Link>
 				) : (
@@ -852,14 +632,14 @@ export default function LessonPage() {
 				{nextLesson ? (
 					<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${nextLesson.id}`}>
 						<Button>
-							{t.nextLesson}
+							Next Lesson
 							<ArrowRight className="h-4 w-4 ml-2" />
 						</Button>
 					</Link>
 				) : (
 					<Link href={`/courses/${courseId}`}>
 						<Button variant="outline">
-							{t.completeModule}
+							Complete Module
 							<BookOpen className="h-4 w-4 ml-2" />
 						</Button>
 					</Link>

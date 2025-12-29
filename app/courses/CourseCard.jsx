@@ -3,17 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, User, CheckCircle2 } from 'lucide-react';
+import { BookOpen, User, CheckCircle2, Eye, X } from 'lucide-react';
+import CoursePreviewModal from './CoursePreviewModal';
 
 export default function CourseCard({ course, currentUserId, currentRole }) {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const [isEnrolled, setIsEnrolled] = useState(false);
 	const [checkingEnrollment, setCheckingEnrollment] = useState(true);
+	const [showPreview, setShowPreview] = useState(false);
 	const router = useRouter();
 
 	const canEdit = currentRole === 'admin' || (currentRole === 'teacher' && course.createdBy === currentUserId);
@@ -23,7 +25,8 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 	// Check enrollment status for students
 	useEffect(() => {
 		async function checkEnrollment() {
-			if (isStudent && currentUserId && isPublished) {
+			// Check enrollment for both published and draft courses (students may have enrolled before course was unpublished)
+			if (isStudent && currentUserId) {
 				try {
 					// Check enrollment directly from Firestore (client-side)
 					const { getDoc } = await import('firebase/firestore');
@@ -41,7 +44,7 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 			}
 		}
 		checkEnrollment();
-	}, [isStudent, currentUserId, course.id, isPublished]);
+	}, [isStudent, currentUserId, course.id]);
 
 	async function handleEnroll() {
 		if (!currentUserId) {
@@ -98,6 +101,30 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 		}
 	}
 
+	async function handleUnenroll() {
+		if (!confirm(`Are you sure you want to unenroll from "${course.title}"? Your progress will be lost.`)) {
+			return;
+		}
+
+		setLoading(true);
+		setError('');
+		try {
+			const { doc, deleteDoc } = await import('firebase/firestore');
+			const enrollmentId = `${currentUserId}_${course.id}`;
+			const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+			await deleteDoc(enrollmentRef);
+			
+			setIsEnrolled(false);
+			// Reload to update the UI
+			window.location.reload();
+		} catch (err) {
+			console.error('Unenrollment error:', err);
+			setError(err.message || 'Failed to unenroll. Please try again.');
+		} finally {
+			setLoading(false);
+		}
+	}
+
 	async function handleUnpublish() {
 		if (!confirm(`Unpublish "${course.title}"? It will be moved back to draft and taken off the live server.`)) {
 			return;
@@ -143,19 +170,40 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 				</div>
 
 				{/* Student Actions */}
-				{isStudent && isPublished && !checkingEnrollment && (
-					<div className="flex items-center gap-2 pt-2 border-t border-border">
+				{/* Show actions for published courses, or for draft courses if student is already enrolled */}
+				{isStudent && (isPublished || isEnrolled) && !checkingEnrollment && (
+					<div className="space-y-2 pt-2 border-t border-border">
 						{isEnrolled ? (
 							<>
-								<CheckCircle2 className="h-5 w-5 text-success" />
-								<Link href={`/courses/${course.id}`} className="flex-1">
-									<Button variant="default" className="w-full">
-										Continue Learning
+								<div className="flex items-center gap-2">
+									<CheckCircle2 className="h-5 w-5 text-success" />
+									<Link href={`/courses/${course.id}`} className="flex-1">
+										<Button variant="default" className="w-full">
+											Continue Learning
+										</Button>
+									</Link>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setShowPreview(true)}
+										title="Preview course structure"
+									>
+										<Eye className="h-4 w-4" />
 									</Button>
-								</Link>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={handleUnenroll}
+									disabled={loading}
+									className="w-full text-error hover:text-error hover:bg-error/10"
+								>
+									<X className="h-4 w-4 mr-2" />
+									{loading ? 'Unenrolling...' : 'Unenroll'}
+								</Button>
 							</>
 						) : (
-							<>
+							<div className="flex items-center gap-2">
 								<Button
 									onClick={handleEnroll}
 									disabled={loading}
@@ -163,12 +211,15 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 								>
 									{loading ? 'Enrolling...' : 'Enroll'}
 								</Button>
-								<Link href={`/courses/${course.id}`}>
-									<Button variant="outline" className="flex-1">
-										View Details
-									</Button>
-								</Link>
-							</>
+								<Button
+									variant="outline"
+									onClick={() => setShowPreview(true)}
+									className="flex-1"
+								>
+									<Eye className="h-4 w-4 mr-2" />
+									Preview
+								</Button>
+							</div>
 						)}
 					</div>
 				)}
@@ -208,7 +259,15 @@ export default function CourseCard({ course, currentUserId, currentRole }) {
 					</div>
 				)}
 			</CardContent>
+
+			{/* Course Preview Modal */}
+			<CoursePreviewModal
+				course={course}
+				isOpen={showPreview}
+				onClose={() => setShowPreview(false)}
+				currentUserId={currentUserId}
+				onEnroll={handleEnroll}
+			/>
 		</Card>
 	);
 }
-

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, PlayCircle, CheckCircle2, Lock, ChevronRight, User, Clock } from 'lucide-react';
+import { BookOpen, PlayCircle, CheckCircle2, Lock, ChevronRight, User, Clock, X } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CourseDetailPage() {
@@ -25,6 +25,9 @@ export default function CourseDetailPage() {
 	const [role, setRole] = useState(null);
 	const [isEnrolled, setIsEnrolled] = useState(false);
 	const [enrollmentLoading, setEnrollmentLoading] = useState(true);
+	const [enrollment, setEnrollment] = useState(null); // Store full enrollment data for progress
+	const [completedLessons, setCompletedLessons] = useState(new Set()); // Track completed lessons
+	const [lastAccessedLesson, setLastAccessedLesson] = useState(null); // Track last accessed lesson
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -35,13 +38,32 @@ export default function CourseDetailPage() {
 				if (userDoc.exists()) {
 					setRole(userDoc.data().role);
 					if (userDoc.data().role === 'student') {
-						// Check enrollment
+						// Check enrollment and get progress
 						try {
-							const response = await fetch(`/api/courses/${courseId}/enroll?studentId=${user.uid}`);
-							const data = await response.json();
-							setIsEnrolled(data.enrolled || false);
+							const enrollmentId = `${user.uid}_${courseId}`;
+							const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+							const enrollmentDoc = await getDoc(enrollmentRef);
+							
+							if (enrollmentDoc.exists()) {
+								const enrollmentData = enrollmentDoc.data();
+								setIsEnrolled(true);
+								setEnrollment(enrollmentData);
+								
+								// Track completed lessons
+								const completed = enrollmentData.progress?.completedLessons || [];
+								setCompletedLessons(new Set(completed));
+								
+								// Find last accessed lesson (first incomplete lesson, or last completed)
+								if (completed.length > 0 && modules.length > 0) {
+									// This will be updated after modules are loaded
+								}
+							} else {
+								setIsEnrolled(false);
+								setEnrollment(null);
+							}
 						} catch (err) {
 							console.error('Error checking enrollment:', err);
+							setIsEnrolled(false);
 						}
 					}
 				}
@@ -153,6 +175,69 @@ export default function CourseDetailPage() {
 		}
 	}, [courseId]);
 
+	// Update last accessed lesson when enrollment or lessons change
+	useEffect(() => {
+		if (isEnrolled && enrollment && modules.length > 0 && Object.keys(lessons).length > 0) {
+			findLastAccessedLesson(modules, lessons, enrollment);
+		}
+	}, [isEnrolled, enrollment, modules, lessons]);
+
+	// Find the last accessed lesson (first incomplete lesson, or last completed lesson)
+	function findLastAccessedLesson(loadedModules, lessonsMap, enrollmentData) {
+		const completed = new Set(enrollmentData.progress?.completedLessons || []);
+		
+		// Find first incomplete lesson
+		for (const module of loadedModules) {
+			const moduleLessons = lessonsMap[module.id] || [];
+			for (const lesson of moduleLessons) {
+				if (!completed.has(lesson.id)) {
+					setLastAccessedLesson({
+						moduleId: module.id,
+						moduleTitle: module.title,
+						lessonId: lesson.id,
+						lessonTitle: lesson.title,
+					});
+					return;
+				}
+			}
+		}
+		
+		// If all lessons completed, find the last completed lesson
+		if (completed.size > 0) {
+			for (let i = loadedModules.length - 1; i >= 0; i--) {
+				const module = loadedModules[i];
+				const moduleLessons = lessonsMap[module.id] || [];
+				for (let j = moduleLessons.length - 1; j >= 0; j--) {
+					const lesson = moduleLessons[j];
+					if (completed.has(lesson.id)) {
+						setLastAccessedLesson({
+							moduleId: module.id,
+							moduleTitle: module.title,
+							lessonId: lesson.id,
+							lessonTitle: lesson.title,
+						});
+						return;
+					}
+				}
+			}
+		}
+		
+		// If no lessons completed, set first lesson
+		if (loadedModules.length > 0) {
+			const firstModule = loadedModules[0];
+			const firstModuleLessons = lessonsMap[firstModule.id] || [];
+			if (firstModuleLessons.length > 0) {
+				const firstLesson = firstModuleLessons[0];
+				setLastAccessedLesson({
+					moduleId: firstModule.id,
+					moduleTitle: firstModule.title,
+					lessonId: firstLesson.id,
+					lessonTitle: firstLesson.title,
+				});
+			}
+		}
+	}
+
 	async function handleEnroll() {
 		if (!userId) {
 			router.push('/login');
@@ -207,6 +292,32 @@ export default function CourseDetailPage() {
 		}
 	}
 
+	async function handleUnenroll() {
+		if (!confirm(`Are you sure you want to unenroll from "${course.title}"? Your progress will be lost.`)) {
+			return;
+		}
+
+		setLoading(true);
+		setError('');
+		try {
+			const { doc, deleteDoc } = await import('firebase/firestore');
+			const enrollmentId = `${userId}_${courseId}`;
+			const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+			await deleteDoc(enrollmentRef);
+			
+			setIsEnrolled(false);
+			setEnrollment(null);
+			setCompletedLessons(new Set());
+			// Reload the page to update the UI
+			window.location.reload();
+		} catch (err) {
+			console.error('Unenrollment error:', err);
+			setError(err.message || 'Failed to unenroll. Please try again.');
+		} finally {
+			setLoading(false);
+		}
+	}
+
 	if (loading || enrollmentLoading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
@@ -227,6 +338,11 @@ export default function CourseDetailPage() {
 
 	const isStudent = role === 'student';
 	const canEnroll = isStudent && !isEnrolled && course.status === 'published';
+	
+	// Calculate overall progress for enrolled students
+	const overallProgress = enrollment?.progress?.overallProgress || 0;
+	const totalLessons = Object.values(lessons).reduce((sum, moduleLessons) => sum + moduleLessons.length, 0);
+	const completedCount = completedLessons.size;
 
 	return (
 		<div className="space-y-8">
@@ -260,15 +376,56 @@ export default function CourseDetailPage() {
 						</Button>
 					)}
 					{isEnrolled && (
-						<span className="px-4 py-2 rounded-lg bg-success/10 text-success text-caption font-medium flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4" />
-							Enrolled
-						</span>
+						<div className="flex flex-col items-end gap-2">
+							<div className="flex items-center gap-3">
+								<span className="px-4 py-2 rounded-lg bg-success/10 text-success text-caption font-medium flex items-center gap-2">
+									<CheckCircle2 className="h-4 w-4" />
+									Enrolled
+								</span>
+								{lastAccessedLesson && (
+									<Link href={`/courses/${courseId}/modules/${lastAccessedLesson.moduleId}/lessons/${lastAccessedLesson.lessonId}`}>
+										<Button size="lg" className="flex items-center gap-2">
+											<PlayCircle className="h-4 w-4" />
+											Continue Learning
+										</Button>
+									</Link>
+								)}
+							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={handleUnenroll}
+								disabled={loading}
+								className="text-error hover:text-error hover:bg-error/10"
+							>
+								<X className="h-4 w-4 mr-2" />
+								{loading ? 'Unenrolling...' : 'Unenroll'}
+							</Button>
+						</div>
 					)}
 				</div>
 				{error && (
 					<div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
 						<p className="text-sm text-destructive">{error}</p>
+					</div>
+				)}
+				
+				{/* Progress Bar for Enrolled Students */}
+				{isEnrolled && enrollment && totalLessons > 0 && (
+					<div className="mt-4 space-y-2">
+						<div className="flex items-center justify-between text-caption">
+							<span className="text-muted-foreground">Course Progress</span>
+							<span className="font-medium text-neutralDark">{overallProgress}%</span>
+						</div>
+						<div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+							<div 
+								className="h-full bg-primary transition-all duration-300"
+								style={{ width: `${overallProgress}%` }}
+							></div>
+						</div>
+						<p className="text-caption text-muted-foreground">
+							{completedCount} of {totalLessons} lessons completed
+						</p>
 					</div>
 				)}
 			</div>
@@ -279,7 +436,9 @@ export default function CourseDetailPage() {
 					<h2 className="text-h2 text-neutralDark">Course Content</h2>
 					{modules.map((module, moduleIndex) => {
 						const moduleLessons = lessons[module.id] || [];
-						const isModuleLocked = isStudent && !isEnrolled && moduleIndex > 0;
+						// Fix: All modules should be locked if student is not enrolled
+						// Only allow viewing course structure, not accessing lessons
+						const isModuleLocked = isStudent && !isEnrolled;
 						
 						return (
 							<Card key={module.id} className={isModuleLocked ? 'opacity-60' : ''}>
@@ -308,7 +467,9 @@ export default function CourseDetailPage() {
 									{moduleLessons.length > 0 ? (
 										<div className="space-y-2">
 											{moduleLessons.map((lesson, lessonIndex) => {
-												const isLessonLocked = isModuleLocked || (isStudent && !isEnrolled);
+												// Fix: Lesson is locked if student is not enrolled
+												const isLessonLocked = isStudent && !isEnrolled;
+												const isCompleted = isEnrolled && completedLessons.has(lesson.id);
 												
 												return (
 													<Link
@@ -317,18 +478,27 @@ export default function CourseDetailPage() {
 														className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 ${
 															isLessonLocked
 																? 'border-border bg-neutralLight cursor-not-allowed opacity-60'
+																: isCompleted
+																? 'border-success/30 bg-success/5 hover:border-success/50 cursor-pointer'
 																: 'border-border hover:border-primary hover:bg-primary/5 cursor-pointer'
 														}`}
 													>
 														{isLessonLocked ? (
 															<Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+														) : isCompleted ? (
+															<CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
 														) : (
 															<div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-caption font-medium flex-shrink-0">
 																{lessonIndex + 1}
 															</div>
 														)}
 														<div className="flex-1 min-w-0">
-															<h4 className="text-body font-medium text-neutralDark">{lesson.title}</h4>
+															<div className="flex items-center gap-2">
+																<h4 className="text-body font-medium text-neutralDark">{lesson.title}</h4>
+																{isCompleted && (
+																	<span className="text-caption text-success font-medium">Completed</span>
+																)}
+															</div>
 															{lesson.contentHtml && (
 																<p className="text-caption text-muted-foreground mt-1 line-clamp-1">
 																	{lesson.contentHtml.replace(/<[^>]*>/g, '').substring(0, 60)}...
