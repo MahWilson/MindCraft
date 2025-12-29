@@ -21,16 +21,21 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, TrendingDown, ArrowRight, Brain } from 'lucide-react';
+import { AlertCircle, TrendingDown, TrendingUp, ArrowRight, Brain, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { auth, db } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function WeakAreasPage() {
+	const { language } = useLanguage();
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [weakAreas, setWeakAreas] = useState([]);
+	const [weakAreaHistory, setWeakAreaHistory] = useState({}); // Track improvement over time
+	const [aiRecommendations, setAiRecommendations] = useState([]);
+	const [systemError, setSystemError] = useState(false);
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -49,6 +54,7 @@ export default function WeakAreasPage() {
 	async function loadWeakAreasForStudent(studentId) {
 		setLoading(true);
 		setError('');
+		setSystemError(false);
 
 		try {
 			// 1. Fetch all submissions for this student
@@ -67,8 +73,9 @@ export default function WeakAreasPage() {
 				return;
 			}
 
-			// 2. Group scores by topic (assessment or assignment title)
+			// 2. Group scores by topic (assessment or assignment title) with timestamps for tracking
 			const topicScores = new Map();
+			const topicHistory = new Map(); // Track historical performance per topic
 
 			for (const submission of submissions) {
 				// Assessments
@@ -98,6 +105,18 @@ export default function WeakAreasPage() {
 								existing.sum += percentScore;
 								existing.count += 1;
 								topicScores.set(key, existing);
+
+								// Track historical performance
+								const submitDate = submission.submittedAt?.toDate 
+									? submission.submittedAt.toDate() 
+									: (submission.submittedAt ? new Date(submission.submittedAt) : new Date());
+								if (!topicHistory.has(key)) {
+									topicHistory.set(key, []);
+								}
+								topicHistory.get(key).push({
+									score: percentScore,
+									date: submitDate,
+								});
 							}
 						}
 					} catch (err) {
@@ -128,6 +147,18 @@ export default function WeakAreasPage() {
 								existing.sum += percentScore;
 								existing.count += 1;
 								topicScores.set(key, existing);
+
+								// Track historical performance
+								const submitDate = submission.submittedAt?.toDate 
+									? submission.submittedAt.toDate() 
+									: (submission.submittedAt ? new Date(submission.submittedAt) : new Date());
+								if (!topicHistory.has(key)) {
+									topicHistory.set(key, []);
+								}
+								topicHistory.get(key).push({
+									score: percentScore,
+									date: submitDate,
+								});
 							}
 						}
 					} catch (err) {
@@ -136,22 +167,94 @@ export default function WeakAreasPage() {
 				}
 			}
 
-			// 3. Build weak area list (topics with average score < 70%)
-			const weakAreaList = Array.from(topicScores.values())
-				.map((entry) => ({
-					topic: entry.topic,
-					avgScore: entry.count > 0 ? entry.sum / entry.count : null,
-					lessonPath: entry.lessonPath,
-				}))
+			// 3. Build weak area list (topics with average score < 70%) with improvement tracking
+			const weakAreaList = Array.from(topicScores.entries())
+				.map(([key, entry]) => {
+					const avgScore = entry.count > 0 ? entry.sum / entry.count : null;
+					const history = topicHistory.get(key) || [];
+					
+					// Sort history by date for display and calculations
+					const sortedHistory = [...history].sort((a, b) => a.date - b.date);
+					
+					// Calculate improvement trend
+					let improvement = null;
+					let trend = 'stable';
+					if (sortedHistory.length >= 2) {
+						const firstHalf = sortedHistory.slice(0, Math.ceil(sortedHistory.length / 2));
+						const secondHalf = sortedHistory.slice(Math.ceil(sortedHistory.length / 2));
+						
+						const firstAvg = firstHalf.reduce((sum, h) => sum + h.score, 0) / firstHalf.length;
+						const secondAvg = secondHalf.reduce((sum, h) => sum + h.score, 0) / secondHalf.length;
+						improvement = secondAvg - firstAvg;
+						
+						if (improvement > 5) trend = 'improving';
+						else if (improvement < -5) trend = 'declining';
+					}
+
+					return {
+						topic: entry.topic,
+						avgScore,
+						lessonPath: entry.lessonPath,
+						history: sortedHistory,
+						improvement,
+						trend,
+					};
+				})
 				.filter((area) => area.avgScore !== null && area.avgScore < 70)
 				.sort((a, b) => (a.avgScore ?? 0) - (b.avgScore ?? 0));
 
 			setWeakAreas(weakAreaList);
+
+			// Store history for display
+			const historyMap = {};
+			topicHistory.forEach((history, key) => {
+				const topic = topicScores.get(key)?.topic;
+				if (topic) {
+					historyMap[topic] = history.sort((a, b) => a.date - b.date);
+				}
+			});
+			setWeakAreaHistory(historyMap);
+
+			// Load AI-based recommendations for weak areas
+			await loadAIRecommendations(studentId, weakAreaList);
 		} catch (err) {
 			console.error('Error loading weak areas:', err);
-			setError('Failed to analyze your performance. Please try again later.');
+			// Handle system errors (A2, E1)
+			if (err.code === 'unavailable' || err.code === 'deadline-exceeded' || err.message?.includes('network')) {
+				setSystemError(true);
+				setError(language === 'bm' 
+					? 'Tidak dapat memuatkan data kemajuan. Sila cuba lagi kemudian.'
+					: 'Unable to load progress data. Please try again later.');
+			} else {
+				setError(language === 'bm' 
+					? 'Gagal menganalisis prestasi anda. Sila cuba lagi kemudian.'
+					: 'Failed to analyze your performance. Please try again later.');
+			}
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	async function loadAIRecommendations(studentId, weakAreas) {
+		try {
+			// Use AI recommendations API to get improvement suggestions
+			const response = await fetch('/api/ai/recommendations', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ language }),
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				// Filter recommendations related to weak areas
+				const weakAreaRecommendations = (data.recommendations || []).filter(rec => 
+					rec.type === 'review_weak_areas' || rec.type === 'ai_help'
+				);
+				setAiRecommendations(weakAreaRecommendations);
+			}
+		} catch (err) {
+			console.error('Error loading AI recommendations:', err);
+			// Don't fail the whole page if AI recommendations fail
 		}
 	}
 
@@ -166,26 +269,50 @@ export default function WeakAreasPage() {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Weak Learning Areas</h1>
-					<p className="text-body text-muted-foreground">Analyzing your assessments and assignments...</p>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Bidang Pembelajaran Lemah' : 'Weak Learning Areas'}
+					</h1>
+					<p className="text-body text-muted-foreground">
+						{language === 'bm' 
+							? 'Menganalisis penilaian dan tugasan anda...'
+							: 'Analyzing your assessments and assignments...'}
+					</p>
 				</div>
 			</div>
 		);
 	}
 
-	if (error) {
+	if (error && !weakAreas.length) {
 		return (
 			<div className="space-y-8">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Weak Learning Areas</h1>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Bidang Pembelajaran Lemah' : 'Weak Learning Areas'}
+					</h1>
 					<p className="text-body text-muted-foreground">
-						We ran into a problem while trying to analyze your performance.
+						{language === 'bm' 
+							? 'Kami menghadapi masalah semasa cuba menganalisis prestasi anda.'
+							: 'We ran into a problem while trying to analyze your performance.'}
 					</p>
 				</div>
 				<Card className="border-destructive bg-destructive/5">
-					<CardContent className="py-6 flex items-center gap-3">
-						<AlertCircle className="h-5 w-5 text-destructive" />
-						<p className="text-body text-destructive">{error}</p>
+					<CardContent className="py-6">
+						<div className="flex items-center gap-3">
+							<AlertCircle className="h-5 w-5 text-destructive" />
+							<div className="flex-1">
+								<p className="text-body text-destructive">{error}</p>
+								{systemError && (
+									<Button 
+										onClick={() => window.location.reload()} 
+										variant="outline" 
+										size="sm" 
+										className="mt-2"
+									>
+										{language === 'bm' ? 'Muat Semula' : 'Reload Page'}
+									</Button>
+								)}
+							</div>
+						</div>
 					</CardContent>
 				</Card>
 			</div>
@@ -197,14 +324,18 @@ export default function WeakAreasPage() {
 			{/* Header */}
 			<div className="flex items-start justify-between gap-4">
 				<div>
-					<h1 className="text-h1 text-neutralDark mb-2">Weak Learning Areas</h1>
+					<h1 className="text-h1 text-neutralDark mb-2">
+						{language === 'bm' ? 'Bidang Pembelajaran Lemah' : 'Weak Learning Areas'}
+					</h1>
 					<p className="text-body text-muted-foreground">
-						Insights into topics where your scores are lowest, based on your recent assessments and assignments.
+						{language === 'bm' 
+							? 'Pandangan tentang topik di mana skor anda paling rendah, berdasarkan penilaian dan tugasan terkini anda.'
+							: 'Insights into topics where your scores are lowest, based on your recent assessments and assignments.'}
 					</p>
 				</div>
 				<Link href="/progress">
 					<Button variant="outline" size="sm">
-						View Overall Progress
+						{language === 'bm' ? 'Lihat Kemajuan Keseluruhan' : 'View Overall Progress'}
 					</Button>
 				</Link>
 			</div>
@@ -215,16 +346,20 @@ export default function WeakAreasPage() {
 						<Brain className="h-6 w-6 text-success" />
 						<div>
 							<p className="text-body font-semibold text-neutralDark">
-								No weak areas detected right now.
+								{language === 'bm' 
+									? 'Tiada bidang lemah dikesan pada masa ini.'
+									: 'No weak areas detected right now.'}
 							</p>
 							<p className="text-caption text-muted-foreground mt-1">
-								Keep completing assessments and assignments. If any topics become challenging, they will appear here
-								with targeted suggestions.
+								{language === 'bm' 
+									? 'Teruskan melengkapkan penilaian dan tugasan. Jika sebarang topik menjadi mencabar, mereka akan muncul di sini dengan cadangan yang disasarkan.'
+									: 'Keep completing assessments and assignments. If any topics become challenging, they will appear here with targeted suggestions.'}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 			) : (
+				<>
 				<div className="space-y-4">
 					{weakAreas.map((area, index) => {
 						const score = typeof area.avgScore === 'number' ? area.avgScore : null;
@@ -240,18 +375,19 @@ export default function WeakAreasPage() {
 											</div>
 											<div className="flex-1">
 												<CardTitle className="text-h3 mb-1">
-													{area.topic || 'Unknown Topic'}
+													{area.topic || (language === 'bm' ? 'Topik Tidak Diketahui' : 'Unknown Topic')}
 												</CardTitle>
 												<CardDescription>
-													This topic is showing lower scores compared to your other work. Reviewing it will help
-													strengthen your foundation.
+													{language === 'bm' 
+														? 'Topik ini menunjukkan skor yang lebih rendah berbanding kerja lain anda. Mengkaji semula akan membantu mengukuhkan asas anda.'
+														: 'This topic is showing lower scores compared to your other work. Reviewing it will help strengthen your foundation.'}
 												</CardDescription>
 											</div>
 										</div>
 										{score !== null && (
 											<div className="text-right">
 												<p className="text-sm font-semibold text-neutralDark">
-													Average Score
+													{language === 'bm' ? 'Skor Purata' : 'Average Score'}
 												</p>
 												<p className="text-2xl font-bold text-error">
 													{score.toFixed(0)}%
@@ -263,23 +399,92 @@ export default function WeakAreasPage() {
 										)}
 									</div>
 								</CardHeader>
-								<CardContent className="flex items-center justify-between gap-4 pt-0">
-									<p className="text-caption text-muted-foreground">
-										Based on your past submissions where your score fell below 70% for this topic.
-									</p>
-									{area.lessonPath && (
-										<Link href={area.lessonPath}>
-											<Button size="sm" className="flex items-center gap-1">
-												Review Related Content
-												<ArrowRight className="h-4 w-4" />
-											</Button>
-										</Link>
+								<CardContent className="pt-0">
+									{/* Improvement Tracking Over Time */}
+									{area.history && area.history.length > 1 && (
+										<div className="mb-4 p-3 bg-muted/30 rounded-lg">
+											<div className="flex items-center gap-2 mb-2">
+												<Calendar className="h-4 w-4 text-muted-foreground" />
+												<span className="text-sm font-medium text-neutralDark">
+													{language === 'bm' ? 'Kemajuan Sepanjang Masa' : 'Progress Over Time'}
+												</span>
+											</div>
+											<div className="space-y-1">
+												{area.history.slice(-5).map((entry, idx) => (
+													<div key={idx} className="flex items-center justify-between text-xs">
+														<span className="text-muted-foreground">
+															{entry.date.toLocaleDateString(language === 'bm' ? 'ms-MY' : 'en-US', { 
+																month: 'short', 
+																day: 'numeric',
+																year: 'numeric'
+															})}
+														</span>
+														<span className={`font-medium ${
+															entry.score >= 70 ? 'text-success' : 
+															entry.score >= 50 ? 'text-warning' : 'text-error'
+														}`}>
+															{entry.score.toFixed(0)}%
+														</span>
+													</div>
+												))}
+											</div>
+										</div>
 									)}
+									<div className="flex items-center justify-between gap-4">
+										<p className="text-caption text-muted-foreground">
+											{language === 'bm' 
+												? 'Berdasarkan penyerahan lepas anda di mana skor anda jatuh di bawah 70% untuk topik ini.'
+												: 'Based on your past submissions where your score fell below 70% for this topic.'}
+										</p>
+										{area.lessonPath && (
+											<Link href={area.lessonPath}>
+												<Button size="sm" className="flex items-center gap-1">
+													{language === 'bm' ? 'Kaji Semula Kandungan Berkaitan' : 'Review Related Content'}
+													<ArrowRight className="h-4 w-4" />
+												</Button>
+											</Link>
+										)}
+									</div>
 								</CardContent>
 							</Card>
 						);
 					})}
 				</div>
+
+				{/* AI-Based Improvement Suggestions */}
+				{aiRecommendations.length > 0 && (
+					<Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-white mt-6">
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Brain className="h-5 w-5 text-primary" />
+								{language === 'bm' ? 'Cadangan Peningkatan Berasaskan AI' : 'AI-Based Improvement Suggestions'}
+							</CardTitle>
+							<CardDescription>
+								{language === 'bm' 
+									? 'Cadangan peribadi untuk membantu anda meningkatkan dalam bidang lemah anda'
+									: 'Personalized recommendations to help you improve in your weak areas'}
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<div className="space-y-3">
+								{aiRecommendations.map((rec, idx) => (
+									<div key={idx} className="p-3 bg-white rounded-lg border border-primary/10">
+										<p className="font-medium text-sm text-neutralDark mb-1">{rec.title}</p>
+										<p className="text-xs text-muted-foreground mb-2">{rec.description}</p>
+										{rec.action && (
+											<Link href={rec.action.path}>
+												<Button variant="ghost" size="sm" className="h-7 text-xs">
+													{rec.action.label} →
+												</Button>
+											</Link>
+										)}
+									</div>
+								))}
+							</div>
+						</CardContent>
+					</Card>
+				)}
+				</>
 			)}
 		</div>
 	);

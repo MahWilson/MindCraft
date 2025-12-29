@@ -45,10 +45,13 @@ import {
 	BookOpen,
 	BarChart3,
 	Activity,
-	Target
+	Target,
+	Clock,
+	FileText
 } from 'lucide-react';
 import { useLanguage } from '@/app/contexts/LanguageContext';
 import { BarChart, LineChart, AreaChart } from '@tremor/react';
+import ReportGenerator from '@/app/components/ReportGenerator';
 
 export default function AnalyticsPage() {
 	const { language } = useLanguage();
@@ -59,6 +62,8 @@ export default function AnalyticsPage() {
 	const [selectedCourseId, setSelectedCourseId] = useState(null);
 	const [courses, setCourses] = useState([]);
 	const [analyticsData, setAnalyticsData] = useState(null);
+	const [error, setError] = useState('');
+	const [systemError, setSystemError] = useState(false);
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -154,6 +159,8 @@ export default function AnalyticsPage() {
 			return;
 		}
 		setAnalyticsLoading(true);
+		setError('');
+		setSystemError(false);
 		try {
 			// Get all enrollments for this course
 			const enrollmentsQuery = query(
@@ -508,6 +515,9 @@ export default function AnalyticsPage() {
 				if (highScoreRisk || mediumScoreRisk) {
 					reasons.push(`Average assessment score below ${riskConfig.minAvgScore}%`);
 				}
+				if (completionRate < 50) {
+					reasons.push(`Low completion rate (${Math.round(completionRate)}%)`);
+				}
 				if (missedDeadlines > 0) {
 					reasons.push(`Missed ${missedDeadlines} deadline${missedDeadlines > 1 ? 's' : ''}`);
 				}
@@ -620,6 +630,17 @@ export default function AnalyticsPage() {
 			});
 		} catch (err) {
 			console.error('Error loading analytics:', err);
+			// Handle system errors (A2, E1)
+			if (err.code === 'unavailable' || err.code === 'deadline-exceeded' || err.message?.includes('network')) {
+				setSystemError(true);
+				setError(language === 'bm' 
+					? 'Tidak dapat memuatkan data analitik. Sila cuba lagi kemudian.'
+					: 'Unable to load analytics data. Please try again later.');
+			} else {
+				setError(language === 'bm' 
+					? 'Ralat semasa memuatkan analitik: ' + (err.message || 'Ralat tidak diketahui')
+					: 'Error loading analytics: ' + (err.message || 'Unknown error'));
+			}
 			// Set empty data on error so UI can still render
 			setAnalyticsData({
 				enrollments: [],
@@ -640,8 +661,14 @@ export default function AnalyticsPage() {
 	}
 
 	function handleExport() {
-		if (!analyticsData) return;
+		if (!analyticsData) {
+			alert(language === 'bm' 
+				? 'Tiada data untuk dieksport'
+				: 'No data to export');
+			return;
+		}
 
+		try {
 			const exportData = {
 				course: analyticsData.courseTitle,
 				generatedAt: new Date().toISOString(),
@@ -661,16 +688,22 @@ export default function AnalyticsPage() {
 				topicHeatmap: analyticsData.topicHeatmap,
 			};
 
-		// Export as JSON
-		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `class-performance-${selectedCourseId}-${Date.now()}.json`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
+			// Export as JSON
+			const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `class-performance-${selectedCourseId}-${Date.now()}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('Error exporting analytics:', err);
+			alert(language === 'bm' 
+				? 'Pembuatan laporan gagal. Sila semak pilihan anda.'
+				: 'Report generation failed. Please check your selections.');
+		}
 	}
 
 	function exportAsCSV() {
@@ -783,10 +816,12 @@ export default function AnalyticsPage() {
 					</p>
 				</div>
 				{analyticsData && (
-					<Button onClick={handleExport} variant="outline" className="flex items-center justify-center gap-2">
-						<Download className="h-4 w-4" />
-						{language === 'bm' ? 'Eksport' : 'Export'}
-					</Button>
+					<div className="relative">
+						<ReportGenerator 
+							data={analyticsData}
+							type="teacher"
+						/>
+					</div>
 				)}
 			</div>
 
@@ -809,6 +844,30 @@ export default function AnalyticsPage() {
 					</select>
 				</CardContent>
 			</Card>
+
+			{/* Error Display */}
+			{error && (
+				<Card className="border-destructive bg-destructive/5">
+					<CardContent className="py-6">
+						<div className="flex items-center gap-3">
+							<AlertTriangle className="h-5 w-5 text-destructive" />
+							<div className="flex-1">
+								<p className="text-body text-destructive">{error}</p>
+								{systemError && (
+									<Button 
+										onClick={() => window.location.reload()} 
+										variant="outline" 
+										size="sm" 
+										className="mt-2"
+									>
+										{language === 'bm' ? 'Muat Semula' : 'Reload Page'}
+									</Button>
+								)}
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			)}
 
 			{analyticsLoading && (
 				<div className="text-center py-8">
@@ -994,11 +1053,30 @@ export default function AnalyticsPage() {
 									{analyticsData.atRiskStudents.map((student, idx) => (
 										<div
 											key={idx}
-											className={`p-4 border rounded-lg ${
+											className={`p-4 border rounded-lg cursor-pointer hover:shadow-md transition-shadow ${
 												student.riskLevel === 'high' 
 													? 'border-red-300 bg-red-50' 
 													: 'border-yellow-300 bg-yellow-50'
 											}`}
+											onClick={() => {
+												// Show detailed risk information
+												const details = `
+${language === 'bm' ? 'Maklumat Risiko Terperinci' : 'Detailed Risk Information'}
+
+${language === 'bm' ? 'Nama Pelajar' : 'Student Name'}: ${student.studentName}
+${language === 'bm' ? 'Tahap Risiko' : 'Risk Level'}: ${student.riskLevel === 'high' ? (language === 'bm' ? 'Risiko Tinggi' : 'High Risk') : (language === 'bm' ? 'Risiko Sederhana' : 'Medium Risk')}
+
+${language === 'bm' ? 'Metrik Prestasi' : 'Performance Metrics'}:
+- ${language === 'bm' ? 'Skor Purata' : 'Average Score'}: ${Math.round(student.avgScore)}%
+- ${language === 'bm' ? 'Kadar Penyiapan' : 'Completion Rate'}: ${Math.round(student.completionRate)}%
+- ${language === 'bm' ? 'Tarikh Akhir Terlepas' : 'Missed Deadlines'}: ${student.missedDeadlines || 0}
+- ${language === 'bm' ? 'Hari Tanpa Aktiviti' : 'Days Inactive'}: ${student.daysSinceActivity}
+
+${language === 'bm' ? 'Faktor Risiko' : 'Risk Factors'}:
+${student.riskReasons.map((reason, i) => `${i + 1}. ${reason}`).join('\n')}
+												`;
+												alert(details);
+											}}
 										>
 											<div className="flex items-center justify-between mb-2">
 												<h4 className="font-semibold text-neutralDark">{student.studentName}</h4>
