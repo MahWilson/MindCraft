@@ -54,7 +54,8 @@ export default function ProfilePage() {
 				}
 			} catch (err) {
 				console.error('Error loading user data:', err);
-				setError('Failed to load user data');
+				setError('Failed to change password. Please try again later.');
+
 			} finally {
 				setLoading(false);
 			}
