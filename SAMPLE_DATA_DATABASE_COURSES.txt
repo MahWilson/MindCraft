@@ -107,6 +107,10 @@ A Database Management System (DBMS) is software that helps you create, manage, a
 - Query optimization
 - Transaction management
 
+**Learning Objectives:**
+- Distinguish between raw data and meaningful information.
+- Identify the core differences between Relational (SQL) and NoSQL databases.
+- Understand the fundamental functions of a Database Management System (DBMS).
 ---
 MODULE 2: Database Design Basics
 ---
@@ -224,6 +228,11 @@ Students Table:
 - course_id (Foreign Key → Courses Table)
 
 This creates a relationship: Each student belongs to one course.
+
+**Learning Objectives:**
+- Explain the structural components of a database table (Rows, Columns, Keys).
+- Select appropriate data types for different types of real-world information.
+- Recognize and define the three primary types of table relationships.
 
 ---
 
@@ -392,6 +401,10 @@ WHERE age < 16;
 ```
 
 **⚠️ Warning:** DELETE is permanent! Always use WHERE clause.
+
+**Learning Objectives:**
+- Define the role of SQL in managing relational databases.
+- Categorize SQL commands into DDL, DML, and DCL groups.
 
 ---
 
@@ -577,6 +590,11 @@ Finds students who have enrollments.
 - Consider performance - sometimes JOINs are faster
 - Test subqueries independently first
 
+**Learning Objectives:**
+- Master JOIN operations to retrieve related data from multiple tables.
+- Use Aggregate Functions and GROUP BY to perform data analysis.
+- Understand how to use subqueries to solve complex data retrieval problems.
+
 ---
 
 ---
@@ -733,6 +751,11 @@ DROP INDEX idx_email ON students;
 - Indexes speed up SELECT queries
 - Indexes slow down INSERT/UPDATE/DELETE
 - Find the right balance for your use case
+
+**Learning Objectives:**
+- Write scripts to create and modify database structures using DDL.
+- Apply constraints to ensure data remains accurate and reliable.
+- Implement basic indexing to improve query search speed.
 
 ---
 
@@ -948,6 +971,10 @@ Teachers Table:
 - Prevents update anomalies
 - Ensures data consistency
 - Makes database more maintainable
+
+**Learning Objectives:**
+- Explain how normalization reduces data redundancy and prevents anomalies.
+- Apply the rules of 1NF, 2NF, and 3NF to organize disorganized data.
 
 ---
 
@@ -1167,6 +1194,11 @@ CREATE TABLE enrollments (
 - Enforces business rules at database level
 - Reduces application-level validation code
 
+**Learning Objectives:**
+- Manage data consistency using Foreign Keys and Referential Integrity rules.
+- Design junction tables to solve Many-to-Many relationship challenges.
+- Implement advanced CHECK constraints to validate data at the database level.
+
 ---
 
 ---
@@ -1372,6 +1404,11 @@ DELETE FROM students WHERE created_at < '2020-01-01';
 - Monitoring tools (Prometheus, Grafana)
 - Backup tools (mysqldump, pg_dump)
 - Performance analyzers (EXPLAIN, Query Profiler)
+
+**Learning Objectives:**
+- Apply query optimization techniques to reduce server response time.
+- Use execution plans (EXPLAIN) to identify and fix slow queries.
+- Develop strategic indexing plans to balance read and write performance.
 
 ---
 
