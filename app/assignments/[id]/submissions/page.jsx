@@ -26,6 +26,8 @@ export default function AssignmentSubmissionsPage() {
 	const [userRole, setUserRole] = useState(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'graded', 'released'
+	const [submissionStatusFilter, setSubmissionStatusFilter] = useState('all'); // 'all', 'submitted', 'late'
+	const [dateFilter, setDateFilter] = useState(''); // 'today', 'week', 'month', 'all', or specific date
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -110,7 +112,7 @@ export default function AssignmentSubmissionsPage() {
 			});
 		}
 
-		// Filter by status
+		// Filter by grading status
 		if (statusFilter !== 'all') {
 			filtered = filtered.filter(sub => {
 				const isGraded = sub.grade !== undefined || sub.feedback;
@@ -122,8 +124,47 @@ export default function AssignmentSubmissionsPage() {
 			});
 		}
 
+		// Filter by submission status (Submitted/Late)
+		if (submissionStatusFilter !== 'all' && assignment?.deadline) {
+			filtered = filtered.filter(sub => {
+				if (!sub.submittedAt) return false;
+				const submitDate = sub.submittedAt.toDate ? sub.submittedAt.toDate() : new Date(sub.submittedAt);
+				const deadlineDate = assignment.deadline.toDate ? assignment.deadline.toDate() : new Date(assignment.deadline);
+				const isLate = submitDate > deadlineDate;
+				
+				if (submissionStatusFilter === 'late') return isLate;
+				if (submissionStatusFilter === 'submitted') return !isLate;
+				return true;
+			});
+		}
+
+		// Filter by date
+		if (dateFilter && dateFilter !== 'all') {
+			const now = new Date();
+			now.setHours(0, 0, 0, 0);
+			
+			filtered = filtered.filter(sub => {
+				if (!sub.submittedAt) return false;
+				const submitDate = sub.submittedAt.toDate ? sub.submittedAt.toDate() : new Date(sub.submittedAt);
+				submitDate.setHours(0, 0, 0, 0);
+				
+				if (dateFilter === 'today') {
+					return submitDate.getTime() === now.getTime();
+				} else if (dateFilter === 'week') {
+					const weekAgo = new Date(now);
+					weekAgo.setDate(weekAgo.getDate() - 7);
+					return submitDate >= weekAgo;
+				} else if (dateFilter === 'month') {
+					const monthAgo = new Date(now);
+					monthAgo.setMonth(monthAgo.getMonth() - 1);
+					return submitDate >= monthAgo;
+				}
+				return true;
+			});
+		}
+
 		setFilteredSubmissions(filtered);
-	}, [submissions, searchQuery, statusFilter, students]);
+	}, [submissions, searchQuery, statusFilter, submissionStatusFilter, dateFilter, students, assignment]);
 
 	function formatDate(timestamp) {
 		if (!timestamp) return language === 'bm' ? 'Tiada' : 'N/A';
@@ -192,29 +233,65 @@ export default function AssignmentSubmissionsPage() {
 			{submissions.length > 0 && (
 				<Card>
 					<CardContent className="pt-6">
-						<div className="flex flex-col md:flex-row gap-4">
-							<div className="flex-1 relative">
-								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-								<Input
-									type="text"
-									placeholder={language === 'bm' ? 'Cari pelajar...' : 'Search students...'}
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-									className="pl-10"
-								/>
+						<div className="space-y-4">
+							<div className="flex flex-col md:flex-row gap-4">
+								<div className="flex-1 relative">
+									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+									<Input
+										type="text"
+										placeholder={language === 'bm' ? 'Cari pelajar...' : 'Search students...'}
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										className="pl-10"
+									/>
+								</div>
 							</div>
-							<div className="flex items-center gap-2">
-								<Filter className="h-4 w-4 text-muted-foreground" />
-								<select
-									value={statusFilter}
-									onChange={(e) => setStatusFilter(e.target.value)}
-									className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-								>
-									<option value="all">{language === 'bm' ? 'Semua Status' : 'All Status'}</option>
-									<option value="pending">{language === 'bm' ? 'Menunggu Gred' : 'Pending Grade'}</option>
-									<option value="graded">{language === 'bm' ? 'Sudah Digred' : 'Graded'}</option>
-									<option value="released">{language === 'bm' ? 'Telah Dilepaskan' : 'Released'}</option>
-								</select>
+							<div className="flex flex-col md:flex-row gap-4">
+								<div className="flex items-center gap-2">
+									<Filter className="h-4 w-4 text-muted-foreground" />
+									<label className="text-sm text-muted-foreground whitespace-nowrap">
+										{language === 'bm' ? 'Status Gred:' : 'Grading Status:'}
+									</label>
+									<select
+										value={statusFilter}
+										onChange={(e) => setStatusFilter(e.target.value)}
+										className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									>
+										<option value="all">{language === 'bm' ? 'Semua' : 'All'}</option>
+										<option value="pending">{language === 'bm' ? 'Menunggu Gred' : 'Pending Grade'}</option>
+										<option value="graded">{language === 'bm' ? 'Sudah Digred' : 'Graded'}</option>
+										<option value="released">{language === 'bm' ? 'Telah Dilepaskan' : 'Released'}</option>
+									</select>
+								</div>
+								<div className="flex items-center gap-2">
+									<label className="text-sm text-muted-foreground whitespace-nowrap">
+										{language === 'bm' ? 'Status Penyerahan:' : 'Submission Status:'}
+									</label>
+									<select
+										value={submissionStatusFilter}
+										onChange={(e) => setSubmissionStatusFilter(e.target.value)}
+										className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									>
+										<option value="all">{language === 'bm' ? 'Semua' : 'All'}</option>
+										<option value="submitted">{language === 'bm' ? 'Tepat Masa' : 'On Time'}</option>
+										<option value="late">{language === 'bm' ? 'Lewat' : 'Late'}</option>
+									</select>
+								</div>
+								<div className="flex items-center gap-2">
+									<label className="text-sm text-muted-foreground whitespace-nowrap">
+										{language === 'bm' ? 'Tarikh:' : 'Date:'}
+									</label>
+									<select
+										value={dateFilter}
+										onChange={(e) => setDateFilter(e.target.value)}
+										className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									>
+										<option value="all">{language === 'bm' ? 'Semua' : 'All'}</option>
+										<option value="today">{language === 'bm' ? 'Hari Ini' : 'Today'}</option>
+										<option value="week">{language === 'bm' ? 'Minggu Lalu' : 'Past Week'}</option>
+										<option value="month">{language === 'bm' ? 'Bulan Lalu' : 'Past Month'}</option>
+									</select>
+								</div>
 							</div>
 						</div>
 						{filteredSubmissions.length !== submissions.length && (
@@ -235,8 +312,8 @@ export default function AssignmentSubmissionsPage() {
 						<FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 						<p className="text-body text-muted-foreground">
 							{language === 'bm' 
-								? 'Tiada penyerahan lagi untuk tugasan ini.'
-								: 'No submissions yet for this assignment.'}
+								? 'Tiada penyerahan tersedia.'
+								: 'No submissions available.'}
 						</p>
 					</CardContent>
 				</Card>
@@ -262,6 +339,22 @@ export default function AssignmentSubmissionsPage() {
 														{language === 'bm' ? 'Dihantar:' : 'Submitted:'} {formatDate(submission.submittedAt)}
 													</div>
 												)}
+												{submission.submittedAt && assignment?.deadline && (() => {
+													const submitDate = submission.submittedAt.toDate ? submission.submittedAt.toDate() : new Date(submission.submittedAt);
+													const deadlineDate = assignment.deadline.toDate ? assignment.deadline.toDate() : new Date(assignment.deadline);
+													const isLate = submitDate > deadlineDate;
+													return isLate ? (
+														<span className="text-xs bg-warning/10 text-warning px-2.5 py-1.5 rounded-md font-medium border border-warning/20 flex items-center gap-1.5">
+															<AlertCircle className="h-3.5 w-3.5" />
+															{language === 'bm' ? 'Lewat' : 'Late'}
+														</span>
+													) : (
+														<span className="text-xs bg-success/10 text-success px-2.5 py-1.5 rounded-md font-medium border border-success/20 flex items-center gap-1.5">
+															<CheckCircle className="h-3.5 w-3.5" />
+															{language === 'bm' ? 'Tepat Masa' : 'On Time'}
+														</span>
+													);
+												})()}
 												{isReleased ? (
 													<span className="text-xs bg-success/10 text-success px-2.5 py-1.5 rounded-md font-medium border border-success/20 flex items-center gap-1.5">
 														<CheckCircle className="h-3.5 w-3.5" />

@@ -26,6 +26,7 @@ export default function AssessmentSubmissionsPage() {
 	const [userRole, setUserRole] = useState(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'graded', 'released'
+	const [dateFilter, setDateFilter] = useState(''); // 'today', 'week', 'month', 'all'
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -122,8 +123,33 @@ export default function AssessmentSubmissionsPage() {
 			});
 		}
 
+		// Filter by date
+		if (dateFilter && dateFilter !== 'all') {
+			const now = new Date();
+			now.setHours(0, 0, 0, 0);
+			
+			filtered = filtered.filter(sub => {
+				if (!sub.submittedAt) return false;
+				const submitDate = sub.submittedAt.toDate ? sub.submittedAt.toDate() : new Date(sub.submittedAt);
+				submitDate.setHours(0, 0, 0, 0);
+				
+				if (dateFilter === 'today') {
+					return submitDate.getTime() === now.getTime();
+				} else if (dateFilter === 'week') {
+					const weekAgo = new Date(now);
+					weekAgo.setDate(weekAgo.getDate() - 7);
+					return submitDate >= weekAgo;
+				} else if (dateFilter === 'month') {
+					const monthAgo = new Date(now);
+					monthAgo.setMonth(monthAgo.getMonth() - 1);
+					return submitDate >= monthAgo;
+				}
+				return true;
+			});
+		}
+
 		setFilteredSubmissions(filtered);
-	}, [submissions, searchQuery, statusFilter, students]);
+	}, [submissions, searchQuery, statusFilter, dateFilter, students]);
 
 	function formatDate(timestamp) {
 		if (!timestamp) return language === 'bm' ? 'Tiada' : 'N/A';
@@ -192,29 +218,51 @@ export default function AssessmentSubmissionsPage() {
 			{submissions.length > 0 && (
 				<Card>
 					<CardContent className="pt-6">
-						<div className="flex flex-col md:flex-row gap-4">
-							<div className="flex-1 relative">
-								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-								<Input
-									type="text"
-									placeholder={language === 'bm' ? 'Cari pelajar...' : 'Search students...'}
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-									className="pl-10"
-								/>
+						<div className="space-y-4">
+							<div className="flex flex-col md:flex-row gap-4">
+								<div className="flex-1 relative">
+									<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+									<Input
+										type="text"
+										placeholder={language === 'bm' ? 'Cari pelajar...' : 'Search students...'}
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										className="pl-10"
+									/>
+								</div>
 							</div>
-							<div className="flex items-center gap-2">
-								<Filter className="h-4 w-4 text-muted-foreground" />
-								<select
-									value={statusFilter}
-									onChange={(e) => setStatusFilter(e.target.value)}
-									className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-								>
-									<option value="all">{language === 'bm' ? 'Semua Status' : 'All Status'}</option>
-									<option value="pending">{language === 'bm' ? 'Menunggu Gred' : 'Pending Grade'}</option>
-									<option value="graded">{language === 'bm' ? 'Sudah Digred' : 'Graded'}</option>
-									<option value="released">{language === 'bm' ? 'Telah Dilepaskan' : 'Released'}</option>
-								</select>
+							<div className="flex flex-col md:flex-row gap-4">
+								<div className="flex items-center gap-2">
+									<Filter className="h-4 w-4 text-muted-foreground" />
+									<label className="text-sm text-muted-foreground whitespace-nowrap">
+										{language === 'bm' ? 'Status Gred:' : 'Grading Status:'}
+									</label>
+									<select
+										value={statusFilter}
+										onChange={(e) => setStatusFilter(e.target.value)}
+										className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									>
+										<option value="all">{language === 'bm' ? 'Semua' : 'All'}</option>
+										<option value="pending">{language === 'bm' ? 'Menunggu Gred' : 'Pending Grade'}</option>
+										<option value="graded">{language === 'bm' ? 'Sudah Digred' : 'Graded'}</option>
+										<option value="released">{language === 'bm' ? 'Telah Dilepaskan' : 'Released'}</option>
+									</select>
+								</div>
+								<div className="flex items-center gap-2">
+									<label className="text-sm text-muted-foreground whitespace-nowrap">
+										{language === 'bm' ? 'Tarikh:' : 'Date:'}
+									</label>
+									<select
+										value={dateFilter}
+										onChange={(e) => setDateFilter(e.target.value)}
+										className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									>
+										<option value="all">{language === 'bm' ? 'Semua' : 'All'}</option>
+										<option value="today">{language === 'bm' ? 'Hari Ini' : 'Today'}</option>
+										<option value="week">{language === 'bm' ? 'Minggu Lalu' : 'Past Week'}</option>
+										<option value="month">{language === 'bm' ? 'Bulan Lalu' : 'Past Month'}</option>
+									</select>
+								</div>
 							</div>
 						</div>
 						{filteredSubmissions.length !== submissions.length && (
@@ -235,8 +283,8 @@ export default function AssessmentSubmissionsPage() {
 						<ClipboardCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 						<p className="text-body text-muted-foreground">
 							{language === 'bm' 
-								? 'Tiada penyerahan lagi untuk penilaian ini.'
-								: 'No submissions yet for this assessment.'}
+								? 'Tiada penyerahan tersedia.'
+								: 'No submissions available.'}
 						</p>
 					</CardContent>
 				</Card>

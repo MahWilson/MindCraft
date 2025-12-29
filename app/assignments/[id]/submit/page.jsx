@@ -137,8 +137,10 @@ export default function SubmitAssignmentPage() {
 		// Validate file type
 		const allowedMimeTypes = [
 			'application/pdf',
-			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-			'application/msword',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+			'application/msword', // .doc
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+			'application/vnd.ms-excel', // .xls
 			'application/zip',
 			'application/x-zip-compressed',
 			'text/plain',
@@ -146,11 +148,12 @@ export default function SubmitAssignmentPage() {
 			'text/x-python',
 			'text/javascript',
 			'text/x-java',
+			'text/x-sql', // .sql
 			'image/jpeg',
 			'image/png',
 		];
 
-		const allowedExtensions = ['.pdf', '.docx', '.doc', '.zip', '.txt', '.md', '.py', '.js', '.java', '.jpg', '.jpeg', '.png'];
+		const allowedExtensions = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip', '.txt', '.md', '.py', '.js', '.java', '.sql', '.jpg', '.jpeg', '.png'];
 		const fileName = file.name.toLowerCase();
 		const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
 
@@ -159,8 +162,8 @@ export default function SubmitAssignmentPage() {
 
 		if (!isValidMimeType && !isValidExtension) {
 			alert(language === 'bm' 
-				? 'Jenis fail tidak disokong. Sila muat naik PDF, DOCX, ZIP, fail teks, atau imej.' 
-				: 'File type not supported. Please upload PDF, DOCX, ZIP, text files, or images.');
+				? 'Jenis fail tidak disokong. Sila muat naik PDF, DOCX, XLSX, SQL, ZIP, fail teks, atau imej.' 
+				: 'File type not supported. Please upload PDF, DOCX, XLSX, SQL, ZIP, text files, or images.');
 			if (fileInputRef.current) fileInputRef.current.value = '';
 			return;
 		}

@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Send, Loader2, Download, FileText, User, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Send, Loader2, Download, FileText, User, Calendar, Clock, CheckCircle2, AlertTriangle, AlertCircle, Eye } from 'lucide-react';
 import Link from 'next/link';
 import RichTextEditor from '@/app/components/RichTextEditor';
 import { useLanguage } from '@/app/contexts/LanguageContext';
@@ -33,6 +33,11 @@ export default function GradeSubmissionPage() {
 	const [autoSaveStatus, setAutoSaveStatus] = useState('');
 	const [userRole, setUserRole] = useState(null);
 	const [error, setError] = useState('');
+	const [fileErrors, setFileErrors] = useState({});
+	const [isReviewed, setIsReviewed] = useState(false);
+	const [systemError, setSystemError] = useState(false);
+	const [attemptNumber, setAttemptNumber] = useState(null);
+	const [course, setCourse] = useState(null);
 
 	// Auto-save timer
 	useEffect(() => {
@@ -85,6 +90,22 @@ export default function GradeSubmissionPage() {
 			setFeedback(submissionData.feedback || '');
 			setIsReleased(submissionData.feedbackReleased || false);
 			setAllowRegrading(submissionData.allowRegrading !== false);
+			setIsReviewed(submissionData.reviewedAt ? true : false);
+
+			// Mark submission as reviewed when teacher first views it (if not already reviewed)
+			if (!submissionData.reviewedAt && auth.currentUser) {
+				try {
+					await updateDoc(doc(db, 'submission', submissionId), {
+						reviewedAt: serverTimestamp(),
+						reviewedBy: auth.currentUser.uid,
+						status: 'Reviewed'
+					});
+					setIsReviewed(true);
+				} catch (err) {
+					console.error('Error marking as reviewed:', err);
+					// Don't fail the load if this fails
+				}
+			}
 
 			// Load student info
 			if (submissionData.studentId) {
@@ -98,19 +119,71 @@ export default function GradeSubmissionPage() {
 			if (submissionData.assignmentId) {
 				const assignmentDoc = await getDoc(doc(db, 'assignment', submissionData.assignmentId));
 				if (assignmentDoc.exists()) {
-					setAssignment({ id: assignmentDoc.id, ...assignmentDoc.data() });
+					const assignmentData = { id: assignmentDoc.id, ...assignmentDoc.data() };
+					setAssignment(assignmentData);
+					
+					// Load course
+					if (assignmentData.courseId) {
+						const courseDoc = await getDoc(doc(db, 'course', assignmentData.courseId));
+						if (courseDoc.exists()) {
+							setCourse({ id: courseDoc.id, ...courseDoc.data() });
+						}
+					}
+					
+					// Calculate attempt number
+					const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore');
+					const attemptsQuery = query(
+						collection(db, 'submission'),
+						where('assignmentId', '==', submissionData.assignmentId),
+						where('studentId', '==', submissionData.studentId),
+						orderBy('submittedAt', 'asc')
+					);
+					const attemptsSnapshot = await getDocs(attemptsQuery);
+					const allAttempts = attemptsSnapshot.docs.map(d => d.id);
+					const currentIndex = allAttempts.indexOf(submissionId);
+					setAttemptNumber(currentIndex >= 0 ? currentIndex + 1 : null);
 				}
 			}
 
 			if (submissionData.assessmentId) {
 				const assessmentDoc = await getDoc(doc(db, 'assessment', submissionData.assessmentId));
 				if (assessmentDoc.exists()) {
-					setAssessment({ id: assessmentDoc.id, ...assessmentDoc.data() });
+					const assessmentData = { id: assessmentDoc.id, ...assessmentDoc.data() };
+					setAssessment(assessmentData);
+					
+					// Load course
+					if (assessmentData.courseId) {
+						const courseDoc = await getDoc(doc(db, 'course', assessmentData.courseId));
+						if (courseDoc.exists()) {
+							setCourse({ id: courseDoc.id, ...courseDoc.data() });
+						}
+					}
+					
+					// Calculate attempt number
+					const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore');
+					const attemptsQuery = query(
+						collection(db, 'submission'),
+						where('assessmentId', '==', submissionData.assessmentId),
+						where('studentId', '==', submissionData.studentId),
+						orderBy('submittedAt', 'asc')
+					);
+					const attemptsSnapshot = await getDocs(attemptsQuery);
+					const allAttempts = attemptsSnapshot.docs.map(d => d.id);
+					const currentIndex = allAttempts.indexOf(submissionId);
+					setAttemptNumber(currentIndex >= 0 ? currentIndex + 1 : null);
 				}
 			}
 		} catch (err) {
 			console.error('Error loading submission:', err);
-			setError('Failed to load submission: ' + (err.message || 'Unknown error'));
+			// Handle system errors (E1)
+			if (err.code === 'unavailable' || err.code === 'deadline-exceeded' || err.message?.includes('network')) {
+				setSystemError(true);
+				setError(language === 'bm' 
+					? 'Ralat sistem yang tidak dijangka berlaku. Sila muat semula atau cuba lagi kemudian.'
+					: 'An unexpected error occurred. Please refresh or try again later.');
+			} else {
+				setError('Failed to load submission: ' + (err.message || 'Unknown error'));
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -144,6 +217,7 @@ export default function GradeSubmissionPage() {
 		}
 
 		setSaving(true);
+		setSystemError(false);
 		try {
 			const updateData = {
 				grade: grade ? parseFloat(grade) : null,
@@ -151,6 +225,7 @@ export default function GradeSubmissionPage() {
 				gradedAt: serverTimestamp(),
 				gradedBy: auth.currentUser.uid,
 				lastSavedAt: serverTimestamp(),
+				status: 'Graded'
 			};
 
 			await updateDoc(doc(db, 'submission', submissionId), updateData);
@@ -158,19 +233,34 @@ export default function GradeSubmissionPage() {
 			setTimeout(() => setAutoSaveStatus(''), 2000);
 		} catch (err) {
 			console.error('Error saving grade:', err);
-			alert(language === 'bm' 
-				? 'Gagal menyimpan gred: ' + (err.message || 'Ralat tidak diketahui')
-				: 'Failed to save grade: ' + (err.message || 'Unknown error'));
+			// Handle system errors (E1)
+			if (err.code === 'unavailable' || err.code === 'deadline-exceeded' || err.message?.includes('network')) {
+				setSystemError(true);
+				alert(language === 'bm' 
+					? 'Ralat sistem yang tidak dijangka berlaku. Sila muat semula atau cuba lagi kemudian. Kemajuan tidak disimpan.'
+					: 'An unexpected error occurred. Please refresh or try again later. Progress was not saved.');
+			} else {
+				alert(language === 'bm' 
+					? 'Gagal menyimpan gred: ' + (err.message || 'Ralat tidak diketahui')
+					: 'Failed to save grade: ' + (err.message || 'Unknown error'));
+			}
 		} finally {
 			setSaving(false);
 		}
 	}
 
 	async function handleReleaseFeedback() {
+		// Enhanced validation (A3: Grade Release Blocked)
+		const missingFields = [];
 		if (!grade && !feedback) {
+			missingFields.push(language === 'bm' ? 'gred atau maklum balas' : 'grade or feedback');
+		}
+		
+		// Check if mandatory fields are missing
+		if (missingFields.length > 0) {
 			alert(language === 'bm' 
-				? 'Sila masukkan gred atau maklum balas sebelum melepaskan' 
-				: 'Please enter a grade or feedback before releasing');
+				? `Sila lengkapkan semua medan gred yang diperlukan sebelum melepaskan: ${missingFields.join(', ')}`
+				: `Please complete all required grading fields before releasing: ${missingFields.join(', ')}`);
 			return;
 		}
 
@@ -181,6 +271,7 @@ export default function GradeSubmissionPage() {
 		}
 
 		setReleasing(true);
+		setSystemError(false);
 		try {
 			const updateData = {
 				grade: grade ? parseFloat(grade) : null,
@@ -191,6 +282,7 @@ export default function GradeSubmissionPage() {
 				gradedAt: serverTimestamp(),
 				gradedBy: auth.currentUser.uid,
 				allowRegrading: allowRegrading,
+				status: 'Graded'
 			};
 
 			await updateDoc(doc(db, 'submission', submissionId), updateData);
@@ -205,9 +297,17 @@ export default function GradeSubmissionPage() {
 			router.push('/assignments');
 		} catch (err) {
 			console.error('Error releasing feedback:', err);
-			alert(language === 'bm' 
-				? 'Gagal melepaskan maklum balas: ' + (err.message || 'Ralat tidak diketahui')
-				: 'Failed to release feedback: ' + (err.message || 'Unknown error'));
+			// Handle system errors (E1)
+			if (err.code === 'unavailable' || err.code === 'deadline-exceeded' || err.message?.includes('network')) {
+				setSystemError(true);
+				alert(language === 'bm' 
+					? 'Ralat sistem yang tidak dijangka berlaku. Sila muat semula atau cuba lagi kemudian. Gred tidak dilepaskan.'
+					: 'An unexpected error occurred. Please refresh or try again later. Grades were not released.');
+			} else {
+				alert(language === 'bm' 
+					? 'Gagal melepaskan maklum balas: ' + (err.message || 'Ralat tidak diketahui')
+					: 'Failed to release feedback: ' + (err.message || 'Unknown error'));
+			}
 		} finally {
 			setReleasing(false);
 		}
@@ -250,6 +350,34 @@ export default function GradeSubmissionPage() {
 		});
 	}
 
+	// Handle file download with corruption detection (A1)
+	async function handleFileDownload(file, fileIndex) {
+		try {
+			// Try to fetch the file to check if it's accessible
+			const response = await fetch(file.url, { method: 'HEAD' });
+			if (!response.ok) {
+				throw new Error('File not accessible');
+			}
+			
+			// Open file in new tab
+			window.open(file.url, '_blank');
+			setFileErrors(prev => {
+				const newErrors = { ...prev };
+				delete newErrors[fileIndex];
+				return newErrors;
+			});
+		} catch (err) {
+			console.error('Error accessing file:', err);
+			setFileErrors(prev => ({
+				...prev,
+				[fileIndex]: true
+			}));
+			alert(language === 'bm' 
+				? 'Tidak dapat membuka fail. Fail mungkin rosak atau tidak dapat diakses.'
+				: 'Unable to open file. The file may be corrupted.');
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="space-y-8">
@@ -275,8 +403,14 @@ export default function GradeSubmissionPage() {
 					</Button>
 				</Link>
 				<Card>
-					<CardContent className="py-12 text-center">
+					<CardContent className="py-12 text-center space-y-4">
+						<AlertCircle className="h-12 w-12 text-destructive mx-auto" />
 						<p className="text-body text-destructive">{error}</p>
+						{systemError && (
+							<Button onClick={() => window.location.reload()}>
+								{language === 'bm' ? 'Muat Semula' : 'Refresh'}
+							</Button>
+						)}
 					</CardContent>
 				</Card>
 			</div>
@@ -330,6 +464,14 @@ export default function GradeSubmissionPage() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
+					{course && (
+						<div className="flex items-center gap-2">
+							<FileText className="h-5 w-5 text-muted-foreground" />
+							<span className="text-sm">
+								<strong>{language === 'bm' ? 'Kursus:' : 'Course:'}</strong> {course.title}
+							</span>
+						</div>
+					)}
 					{student && (
 						<div className="flex items-center gap-2">
 							<User className="h-5 w-5 text-muted-foreground" />
@@ -343,6 +485,14 @@ export default function GradeSubmissionPage() {
 							<Calendar className="h-5 w-5 text-muted-foreground" />
 							<span className="text-sm">
 								<strong>{language === 'bm' ? 'Dihantar pada:' : 'Submitted on:'}</strong> {formatDate(submission.submittedAt)}
+							</span>
+						</div>
+					)}
+					{attemptNumber !== null && (
+						<div className="flex items-center gap-2">
+							<Clock className="h-5 w-5 text-muted-foreground" />
+							<span className="text-sm">
+								<strong>{language === 'bm' ? 'Cubaan:' : 'Attempt:'}</strong> {attemptNumber}
 							</span>
 						</div>
 					)}
@@ -370,6 +520,22 @@ export default function GradeSubmissionPage() {
 							})()}
 						</div>
 					)}
+					{isReviewed && !isReleased && (
+						<div className="flex items-center gap-2">
+							<Eye className="h-5 w-5 text-info" />
+							<span className="text-sm text-info">
+								<strong>{language === 'bm' ? 'Status:' : 'Status:'}</strong> {language === 'bm' ? 'Telah Dikaji' : 'Reviewed'}
+							</span>
+						</div>
+					)}
+					{submission?.status === 'Graded' && !isReleased && (
+						<div className="flex items-center gap-2">
+							<CheckCircle2 className="h-5 w-5 text-primary" />
+							<span className="text-sm text-primary">
+								<strong>{language === 'bm' ? 'Status:' : 'Status:'}</strong> {language === 'bm' ? 'Telah Digred' : 'Graded'}
+							</span>
+						</div>
+					)}
 					{isReleased && (
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="h-5 w-5 text-success" />
@@ -394,13 +560,18 @@ export default function GradeSubmissionPage() {
 									<div className="flex items-center gap-2">
 										<FileText className="h-5 w-5 text-muted-foreground" />
 										<span className="text-sm">{file.name}</span>
+										{fileErrors[idx] && (
+											<AlertCircle className="h-4 w-4 text-destructive" title={language === 'bm' ? 'Fail rosak atau tidak dapat diakses' : 'File corrupted or inaccessible'} />
+										)}
 									</div>
-									<a href={file.url} target="_blank" rel="noopener noreferrer">
-										<Button variant="outline" size="sm">
-											<Download className="h-4 w-4 mr-2" />
-											{language === 'bm' ? 'Muat Turun' : 'Download'}
-										</Button>
-									</a>
+									<Button 
+										variant="outline" 
+										size="sm"
+										onClick={() => handleFileDownload(file, idx)}
+									>
+										<Download className="h-4 w-4 mr-2" />
+										{language === 'bm' ? 'Muat Turun' : 'Download'}
+									</Button>
 								</div>
 							))}
 						</div>
@@ -438,6 +609,25 @@ export default function GradeSubmissionPage() {
 				</Card>
 			)}
 
+			{/* Rubric Display */}
+			{(assignment?.rubric || assessment?.rubric) && (
+				<Card>
+					<CardHeader>
+						<CardTitle>{language === 'bm' ? 'Rubrik Penilaian' : 'Grading Rubric'}</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="prose max-w-none">
+							{assignment?.rubric && (
+								<div dangerouslySetInnerHTML={{ __html: assignment.rubric }} />
+							)}
+							{assessment?.rubric && (
+								<div dangerouslySetInnerHTML={{ __html: assessment.rubric }} />
+							)}
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Grading Form */}
 			<Card>
 				<CardHeader>
@@ -451,7 +641,7 @@ export default function GradeSubmissionPage() {
 				<CardContent className="space-y-6">
 					<div>
 						<label htmlFor="grade" className="block text-sm font-medium mb-2">
-							{language === 'bm' ? 'Gred' : 'Grade'} {assessment ? `(Max: ${maxGrade})` : '(0-100)'}
+							{language === 'bm' ? 'Gred' : 'Grade'} {assessment ? `(Max: ${maxGrade})` : '(0-100)'} <span className="text-destructive">*</span>
 						</label>
 						<Input
 							id="grade"
@@ -464,6 +654,7 @@ export default function GradeSubmissionPage() {
 							placeholder={language === 'bm' ? 'Masukkan gred' : 'Enter grade'}
 							disabled={isReleased && !allowRegrading}
 							className="w-32"
+							required
 						/>
 						{assessment && submission?.totalPoints && (
 							<p className="text-xs text-muted-foreground mt-1">
@@ -506,6 +697,19 @@ export default function GradeSubmissionPage() {
 						<p className="text-sm text-muted-foreground">
 							{autoSaveStatus}
 						</p>
+					)}
+
+					{systemError && (
+						<div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+							<div className="flex items-center gap-2 text-destructive">
+								<AlertCircle className="h-4 w-4" />
+								<p className="text-sm font-medium">
+									{language === 'bm' 
+										? 'Ralat sistem yang tidak dijangka berlaku. Sila muat semula atau cuba lagi kemudian.'
+										: 'An unexpected error occurred. Please refresh or try again later.'}
+								</p>
+							</div>
+						</div>
 					)}
 
 					<div className="flex gap-4 pt-4 border-t">
