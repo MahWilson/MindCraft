@@ -9,6 +9,7 @@ import CourseManagement from './CourseManagement';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import { useLanguage } from '@/app/contexts/LanguageContext';
 
 export default function AdminCoursesPage() {
@@ -218,12 +219,13 @@ export default function AdminCoursesPage() {
 				<div className="space-y-2">
 					<h1 className="text-h1 text-neutralDark">{t.pageTitle}</h1>
 					<p className="text-body text-muted-foreground">{t.pageDescription}</p>
-					<div className="mt-2 max-w-md">
+					<div className="mt-2 max-w-md relative">
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
 						<Input
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 							placeholder={t.searchPlaceholder}
-							className="w-full"
+							className="w-full pl-10"
 						/>
 					</div>
 				</div>
