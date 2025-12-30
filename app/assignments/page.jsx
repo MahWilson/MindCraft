@@ -16,6 +16,7 @@ export default function AssignmentsPage() {
 	const [userRole, setUserRole] = useState(null);
 	const [currentUserId, setCurrentUserId] = useState(null);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const [submissions, setSubmissions] = useState({});
 	const router = useRouter();
 
 	useEffect(() => {
@@ -40,34 +41,80 @@ export default function AssignmentsPage() {
 	useEffect(() => {
 		if (userRole) {
 			loadAssignments();
+			if (userRole === 'student' && currentUserId) {
+				loadSubmissions();
+			}
 		}
-	}, [userRole]);
+	}, [userRole, currentUserId]);
+
+	async function loadSubmissions() {
+		try {
+			const submissionsQuery = query(
+				collection(db, 'submission'),
+				where('studentId', '==', currentUserId)
+			);
+			const snapshot = await getDocs(submissionsQuery);
+			const subs = {};
+			snapshot.docs.forEach(doc => {
+				const data = doc.data();
+				// Use assignmentId as key since assignments use that field in submission
+				if (data.assignmentId) {
+					subs[data.assignmentId] = { id: doc.id, ...data };
+				}
+			});
+			setSubmissions(subs);
+		} catch (err) {
+			console.error('Error loading submissions:', err);
+		}
+	}
 
 	async function loadAssignments() {
 		setLoading(true);
 		try {
-			let assignmentsQuery;
+			let loadedAssignments = [];
 
 			if (userRole === 'student') {
-				// Students only see published assignments
-				assignmentsQuery = query(
-					collection(db, 'assignment'),
-					where('status', '==', 'published'),
-					orderBy('createdAt', 'desc')
+				// 1. Get student's enrolled course IDs
+				const enrollmentsQuery = query(
+					collection(db, 'enrollment'),
+					where('studentId', '==', currentUserId)
 				);
+				const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+				const enrolledCourseIds = enrollmentsSnapshot.docs.map(doc => doc.data().courseId);
+
+				if (enrolledCourseIds.length > 0) {
+					// 2. Load all published assignments
+					// We query all published first to avoid complex composite index issues with courseId
+					const assignmentsQuery = query(
+						collection(db, 'assignment'),
+						where('status', '==', 'published')
+					);
+					const snapshot = await getDocs(assignmentsQuery);
+
+					// 3. Filter by enrolled courses client-side
+					loadedAssignments = snapshot.docs
+						.map(doc => ({ id: doc.id, ...doc.data() }))
+						.filter(a => enrolledCourseIds.includes(a.courseId));
+				}
 			} else {
 				// Teachers and admins see all assignments
-				assignmentsQuery = query(
+				const assignmentsQuery = query(
 					collection(db, 'assignment'),
 					orderBy('createdAt', 'desc')
 				);
+				const snapshot = await getDocs(assignmentsQuery);
+				loadedAssignments = snapshot.docs.map(doc => ({
+					id: doc.id,
+					...doc.data(),
+				}));
 			}
 
-			const snapshot = await getDocs(assignmentsQuery);
-			const loadedAssignments = snapshot.docs.map(doc => ({
-				id: doc.id,
-				...doc.data(),
-			}));
+			// Client-side sort for consistency across roles
+			loadedAssignments.sort((a, b) => {
+				const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt || 0);
+				const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt || 0);
+				return timeB - timeA;
+			});
 
 			setAssignments(loadedAssignments);
 		} catch (err) {
@@ -199,8 +246,8 @@ export default function AssignmentsPage() {
 				</div>
 				{isTeacherOrAdmin && (
 					<Link href="/assignments/new">
-						<Button>
-							<Plus className="h-4 w-4 mr-2" />
+						<Button className="h-16 px-8 text-base font-black shadow-[0_15px_30px_rgba(0,0,0,0.1)] hover:shadow-primary/20 transition-all duration-300 bg-gradient-to-r from-primary to-primary/80 hover:scale-[1.03] active:scale-[0.97] border-none rounded-[20px] uppercase tracking-widest">
+							<Plus className="h-6 w-6 mr-3" />
 							Create Assignment
 						</Button>
 					</Link>
@@ -288,17 +335,17 @@ export default function AssignmentsPage() {
 
 									<div className="pt-4 border-t border-border/50">
 										{isTeacherOrAdmin ? (
-											<div className="grid grid-cols-2 gap-3">
+											<div className="grid grid-cols-2 gap-6 mt-4">
 												<Link href={`/assignments/${assignment.id}/edit`} className="w-full">
-													<Button variant="outline" className="w-full h-10 border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/60" title="Edit Assignment">
-														<Edit2 className="h-4 w-4 mr-2" />
+													<Button variant="outline" className="w-full h-20 text-base font-black border-2 border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/60 transition-all duration-300 rounded-[20px] shadow-sm hover:shadow-lg hover:shadow-primary/5 uppercase tracking-tighter" title="Edit Assignment">
+														<Edit2 className="h-6 w-6 mr-2" />
 														Edit
 													</Button>
 												</Link>
 
 												<Link href={`/assignments/${assignment.id}`} className="w-full">
-													<Button variant="outline" className="w-full h-10 border-neutral-300 text-neutralDark hover:bg-neutral-100 hover:border-neutral-400" title="View Submissions">
-														<FileText className="h-4 w-4 mr-2" />
+													<Button variant="outline" className="w-full h-20 text-base font-black border-2 border-neutral-200 text-neutralDark hover:bg-neutral-50 hover:border-neutral-400 transition-all duration-300 rounded-[20px] shadow-sm hover:shadow-lg uppercase tracking-tighter" title="View Submissions">
+														<FileText className="h-6 w-6 mr-2" />
 														Submissions
 													</Button>
 												</Link>
@@ -307,18 +354,18 @@ export default function AssignmentsPage() {
 													variant="outline"
 													onClick={() => togglePublish(assignment)}
 													title={assignment.status === 'published' ? 'Unpublish' : 'Publish'}
-													className={`w-full h-10 ${assignment.status === 'published'
-														? "border-warning/30 text-warning hover:bg-warning/10 hover:border-warning/50"
-														: "border-success/30 text-success hover:bg-success/10 hover:border-success/50"}`}
+													className={`w-full h-20 text-base font-black border-2 transition-all duration-300 rounded-[20px] shadow-sm hover:shadow-lg uppercase tracking-tighter ${assignment.status === 'published'
+														? "border-warning/30 text-warning hover:bg-warning/5 hover:border-warning/60"
+														: "border-success/30 text-success hover:bg-success/5 hover:border-success/60"}`}
 												>
 													{assignment.status === 'published' ? (
 														<>
-															<EyeOff className="h-4 w-4 mr-2" />
+															<EyeOff className="h-6 w-6 mr-2" />
 															Unpublish
 														</>
 													) : (
 														<>
-															<Eye className="h-4 w-4 mr-2" />
+															<Eye className="h-6 w-6 mr-2" />
 															Publish
 														</>
 													)}
@@ -328,19 +375,39 @@ export default function AssignmentsPage() {
 													variant="destructive"
 													onClick={() => confirmDelete(assignment.id)}
 													title="Delete Assignment"
-													className="w-full h-10 bg-red-600 hover:bg-red-700 text-white shadow-sm"
+													className="w-full h-20 text-base font-black bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white border-none transition-all duration-300 rounded-[20px] shadow-xl hover:shadow-red-200 uppercase tracking-tighter scale-100 hover:scale-[1.03] active:scale-[0.97]"
 												>
-													<Trash2 className="h-4 w-4 mr-2" />
+													<Trash2 className="h-6 w-6 mr-2" />
 													Delete
 												</Button>
 											</div>
 										) : (
-											<Link href={`/assignments/${assignment.id}`} className="w-full">
-												<Button className="w-full h-11 text-base shadow-sm hover:shadow-md transition-all" variant="default">
-													View Details
-													<ArrowRight className="h-5 w-5 ml-2" />
-												</Button>
-											</Link>
+											<div className="space-y-6">
+												{submissions[assignment.id] && (
+													<div className="p-5 bg-success/5 border-2 border-success/10 rounded-[24px] flex items-center justify-between gap-4 shadow-sm group-hover:scale-[1.01] transition-transform">
+														<div className="flex items-center gap-4">
+															<div className="p-2 bg-success/10 rounded-full">
+																<CheckCircle className="h-6 w-6 text-success" />
+															</div>
+															<div className="flex flex-col">
+																<span className="text-[11px] text-success/60 font-black uppercase tracking-widest leading-none">Status</span>
+																<span className="text-base text-success font-black">
+																	{submissions[assignment.id].status === 'submitted' ? 'SUBMITTED' : 'DRAFT SAVED'}
+																</span>
+															</div>
+														</div>
+														{submissions[assignment.id].status === 'submitted' && (
+															<div className="px-3 py-1.5 bg-success/20 rounded-lg text-[10px] font-black tracking-tighter text-success">LOCKED</div>
+														)}
+													</div>
+												)}
+												<Link href={`/assignments/${assignment.id}`} className="block group/btn">
+													<Button className="w-full h-16 text-lg font-black shadow-2xl hover:shadow-primary/30 transition-all duration-500 bg-neutralDark hover:bg-black group-hover/btn:scale-[1.03] active:scale-[0.97] rounded-[24px] border-none" variant="default">
+														<span className="relative z-10 tracking-widest">VIEW ASSIGNMENT</span>
+														<ArrowRight className="h-7 w-7 ml-3 transition-transform group-hover/btn:translate-x-3 relative z-10" />
+													</Button>
+												</Link>
+											</div>
 										)}
 									</div>
 								</CardContent>
@@ -390,20 +457,20 @@ export default function AssignmentsPage() {
 								)}
 							</div>
 
-							<div className="flex gap-3 justify-end pt-2">
+							<div className="flex gap-4 justify-end pt-4">
 								<Button
 									variant="outline"
 									onClick={() => setDeleteConfirm(null)}
-									className="px-6"
+									className="h-12 px-8 text-sm font-bold border-2 rounded-xl hover:bg-neutral-50 transition-all"
 								>
 									Cancel
 								</Button>
 								<Button
 									variant="destructive"
 									onClick={executeDelete}
-									className="px-6 bg-red-600 hover:bg-red-700 text-white"
+									className="h-12 px-8 text-sm font-bold bg-red-600 hover:bg-red-700 text-white border-none rounded-xl shadow-lg hover:shadow-red-200 transition-all flex items-center gap-2"
 								>
-									<Trash2 className="h-4 w-4 mr-2" />
+									<Trash2 className="h-4 w-4" />
 									Delete
 								</Button>
 							</div>

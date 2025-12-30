@@ -7,21 +7,20 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Clock, Edit2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Edit2, AlertCircle, CheckCircle, XCircle, Upload, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
+import { useParams } from 'next/navigation';
 
-export default function AssignmentDetailPage({ params }) {
+export default function AssignmentDetailPage() {
     const [assignment, setAssignment] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
     const [error, setError] = useState(null);
     const router = useRouter();
 
-    // Unwrap params using React.use() as recommended for Next.js 15+ or handle async params
-    // However, in client components for typical Next.js 13/14 usage params is passed as prop
-    // We will assume standard behavior but handle potentional async nature if needed in future
-    const { id } = React.use(params);
+    const params = useParams();
+    const id = params.id;
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -227,13 +226,31 @@ export default function AssignmentDetailPage({ params }) {
                     </div>
 
                     {/* Description */}
-                    <div>
+                    <div className="pb-8">
                         <h3 className="text-lg font-semibold mb-3 text-neutralDark">Instructions</h3>
                         <div
                             className="prose max-w-none text-body text-neutralDark/80"
                             dangerouslySetInnerHTML={{ __html: assignment.description }}
                         />
                     </div>
+
+                    {/* Action Button for Students */}
+                    {!isTeacherOrAdmin && assignment.isOpen && (
+                        <div className="pt-10 border-t border-border/50">
+                            <Link href={`/assignments/${assignment.id}/submit`} className="w-full block group">
+                                <Button className="w-full h-20 text-xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.1)] hover:shadow-primary/30 transition-all duration-500 bg-gradient-to-br from-primary via-primary to-primary/80 hover:scale-[1.02] active:scale-[0.98] border-none rounded-[24px] group-hover:brightness-110">
+                                    <div className="flex items-center justify-center gap-3">
+                                        <Upload className="h-7 w-7 animate-pulse group-hover:animate-bounce" />
+                                        <span className="tracking-[0.1em]">SUBMIT YOUR ASSIGNMENT</span>
+                                        <ArrowRight className="h-7 w-7 transition-transform group-hover:translate-x-3" />
+                                    </div>
+                                </Button>
+                            </Link>
+                            <p className="text-center text-[10px] text-muted-foreground mt-6 font-black uppercase tracking-[0.2em] opacity-40">
+                                Final check before secure submission
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

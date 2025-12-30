@@ -46,7 +46,7 @@ function getNavItems(role) {
 			{ href: '/courses/explore', label: 'Explore Courses' },
 			{ href: '/profile', label: 'Profile' },
 			{ href: '/assessments', label: 'Assessments' },
-			{ href: '/assessments?type=assignment', label: 'Assignments' },
+			{ href: '/assignments', label: 'Assignments' },
 			{ href: '/progress', label: 'Progress' },
 			{ href: '/forum', label: 'Forum' },
 			{ href: '/ai/coding-help', label: 'Coding Help' },
