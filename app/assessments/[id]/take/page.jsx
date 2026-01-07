@@ -587,7 +587,7 @@ export default function TakeAssessmentPage() {
 																		<td key={idx} className="px-2 py-2 text-center text-muted-foreground border-b border-border">
 																			…
 																		</td>
-																	))}
+											))}
 																</tr>
 															</tbody>
 														</table>

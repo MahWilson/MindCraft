@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
@@ -169,6 +169,61 @@ export default function CreateAssessmentPage() {
 		notes: gameLevelTemplates[0].defaults.notes,
 	});
 	const [gameLevelBlocks, setGameLevelBlocks] = useState(gameLevelTemplates[0].defaults.blockSequence || []);
+	const [errors, setErrors] = useState({});
+	const errorRefs = useRef({});
+
+	// Scroll to first error when errors are set
+	useEffect(() => {
+		if (Object.keys(errors).length > 0) {
+			// Find the first error field and scroll to it
+			const errorKeys = Object.keys(errors);
+			const firstErrorKey = errorKeys[0];
+			
+			// Map error keys to element IDs
+			let elementId = null;
+			if (firstErrorKey === 'title') {
+				elementId = 'title';
+			} else if (firstErrorKey === 'courseId') {
+				elementId = 'course';
+			} else if (firstErrorKey === 'tableA') {
+				elementId = 'tableA';
+			} else if (firstErrorKey === 'columns') {
+				elementId = 'columns';
+			} else if (firstErrorKey === 'notes') {
+				elementId = 'notes';
+			} else if (firstErrorKey === 'gameLevelType') {
+				elementId = 'gameLevelType';
+			} else if (firstErrorKey === 'blockSequence') {
+				elementId = 'blockSequence';
+			} else if (firstErrorKey.startsWith('blockLabel_')) {
+				elementId = `blockLabel_${firstErrorKey.split('_')[1]}`;
+			} else if (firstErrorKey.startsWith('question_')) {
+				elementId = `question_${firstErrorKey.split('_')[1]}`;
+			} else if (firstErrorKey.startsWith('questionOptions_')) {
+				elementId = `questionOptions_${firstErrorKey.split('_')[1]}`;
+			} else if (firstErrorKey.startsWith('questionOption_')) {
+				elementId = `questionOption_${firstErrorKey}`;
+			} else if (firstErrorKey === 'questions') {
+				elementId = 'questions';
+			}
+
+			// Scroll to the element
+			setTimeout(() => {
+				const element = elementId ? document.getElementById(elementId) : null;
+				if (element) {
+					element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					const input = element.querySelector('input, textarea, select');
+					if (input) input.focus();
+				} else {
+					// Fallback: scroll to first error message
+					const firstErrorElement = document.querySelector('.text-error');
+					if (firstErrorElement) {
+						firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					}
+				}
+			}, 100);
+		}
+	}, [errors]);
 
 	function addBlockToSequence(type) {
 		if (!type) return;
@@ -354,53 +409,69 @@ export default function CreateAssessmentPage() {
 
 	async function handleSubmit(e) {
 		e.preventDefault();
+		const newErrors = {};
 
+		// Basic validation
 		if (!title.trim()) {
-			alert('Assessment title is required');
-			return;
+			newErrors.title = 'Assessment title is required';
 		}
 
 		if (!courseId) {
-			alert('Please select a course');
-			return;
+			newErrors.courseId = 'Please select a course';
 		}
 
 		if (type !== 'gameLevel' && questions.length === 0) {
-			alert('Please add at least one question');
-			return;
+			newErrors.questions = 'Please add at least one question';
 		}
 
+		// Game level validation
 		if (type === 'gameLevel') {
 			if (!gameLevelType) {
-				alert('Pick a game level type');
-				return;
+				newErrors.gameLevelType = 'Please select a game level type';
+			}
+			if (!gameLevelConfig.tableA.trim()) {
+				newErrors.tableA = 'Please enter Main table name';
+			}
+			if (!gameLevelConfig.columns.trim()) {
+				newErrors.columns = 'Please enter Columns / fields in play';
+			}
+			if (!gameLevelConfig.notes.trim()) {
+				newErrors.notes = 'Please enter Goal / notes shown to students';
 			}
 			if (gameLevelBlocks.length === 0) {
-				alert('Add the required block sequence for this game level.');
-				return;
+				newErrors.blockSequence = 'Add at least one block to the sequence';
 			}
-			if (gameLevelBlocks.some(b => !b.label?.trim())) {
-				alert('Every block needs a label. Fill or remove empty ones.');
-				return;
-			}
+			gameLevelBlocks.forEach((block, idx) => {
+				if (!block.label?.trim()) {
+					newErrors[`blockLabel_${idx}`] = 'Please enter Block label';
+				}
+			});
 		} else {
-			for (const q of questions) {
+			// Question validation
+			questions.forEach((q, qIdx) => {
 				if (!q.question.trim()) {
-					alert('All questions must have a question text');
-					return;
+					newErrors[`question_${qIdx}`] = 'Question text is required';
 				}
 				if (q.type === 'mcq') {
 					if (q.options.length < 2) {
-						alert('MCQ questions must have at least 2 options');
-						return;
+						newErrors[`questionOptions_${qIdx}`] = 'MCQ questions must have at least 2 options';
 					}
-					if (q.options.some(opt => !opt.trim())) {
-						alert('All MCQ options must be filled');
-						return;
-					}
+					q.options.forEach((opt, optIdx) => {
+						if (!opt.trim()) {
+							newErrors[`questionOption_${qIdx}_${optIdx}`] = 'Option cannot be empty';
+						}
+					});
 				}
-			}
+			});
 		}
+
+		if (Object.keys(newErrors).length > 0) {
+			setErrors(newErrors);
+			// Scroll will happen in useEffect
+			return;
+		}
+
+		setErrors({});
 
 		setSubmitting(true);
 
@@ -495,28 +566,36 @@ export default function CreateAssessmentPage() {
 							<CardDescription>Enter the assessment details</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4">
-							<div>
-								<label htmlFor="title" className="block text-sm font-medium mb-2">
+							<div id="title">
+								<label htmlFor="title-input" className="block text-sm font-medium mb-2">
 									Assessment Title <span className="text-destructive">*</span>
 								</label>
 								<Input
-									id="title"
+									id="title-input"
 									value={title}
-									onChange={(e) => setTitle(e.target.value)}
+									onChange={(e) => {
+										setTitle(e.target.value);
+										if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
+									}}
 									placeholder="e.g., Python Fundamentals Quiz"
 									required
+									className={errors.title ? 'border-destructive' : ''}
 								/>
+								{errors.title && <p className="text-sm text-destructive mt-1">{errors.title}</p>}
 							</div>
 
-							<div>
-								<label htmlFor="course" className="block text-sm font-medium mb-2">
+							<div id="course">
+								<label htmlFor="course-select" className="block text-sm font-medium mb-2">
 									Course <span className="text-destructive">*</span>
 								</label>
 								<select
-									id="course"
+									id="course-select"
 									value={courseId}
-									onChange={handleCourseChange}
-									className="w-full px-3 py-2 border border-border rounded-md bg-white"
+									onChange={(e) => {
+										handleCourseChange(e);
+										if (errors.courseId) setErrors(prev => ({ ...prev, courseId: '' }));
+									}}
+									className={`w-full px-3 py-2 border rounded-md bg-white ${errors.courseId ? 'border-destructive' : 'border-border'}`}
 									required
 								>
 									<option value="">Select a course</option>
@@ -526,6 +605,7 @@ export default function CreateAssessmentPage() {
 										</option>
 									))}
 								</select>
+								{errors.courseId && <p className="text-sm text-destructive mt-1">{errors.courseId}</p>}
 							</div>
 
 							<div>
@@ -594,33 +674,47 @@ export default function CreateAssessmentPage() {
 								<CardDescription>Pick a SQL-themed level type and name the tables/entities.</CardDescription>
 							</CardHeader>
 							<CardContent className="space-y-4">
-								<div className="grid md:grid-cols-2 gap-3">
-									{gameLevelTemplates.map((tpl) => (
-										<button
-											type="button"
-											key={tpl.id}
-											onClick={() => {
-												setGameLevelType(tpl.id);
-												setGameLevelConfig(tpl.defaults);
-												setGameLevelBlocks(tpl.defaults.blockSequence || []);
-											}}
-											className={`text-left border rounded p-3 space-y-1 transition ${
-												gameLevelType === tpl.id ? 'border-primary bg-primary/5' : 'border-border bg-white'
-											}`}
-										>
-											<p className="font-semibold text-body">{tpl.title}</p>
-											<p className="text-caption text-muted-foreground">{tpl.goal}</p>
-										</button>
-									))}
+								<div id="gameLevelType">
+									<p className="text-sm font-medium mb-2">
+										Game Level Type <span className="text-destructive">*</span>
+									</p>
+									<div className="grid md:grid-cols-2 gap-3">
+										{gameLevelTemplates.map((tpl) => (
+											<button
+												type="button"
+												key={tpl.id}
+												onClick={() => {
+													setGameLevelType(tpl.id);
+													setGameLevelConfig(tpl.defaults);
+													setGameLevelBlocks(tpl.defaults.blockSequence || []);
+													if (errors.gameLevelType) setErrors(prev => ({ ...prev, gameLevelType: '' }));
+												}}
+												className={`text-left border rounded p-3 space-y-1 transition ${
+													gameLevelType === tpl.id ? 'border-primary bg-primary/5' : 'border-border bg-white'
+												} ${errors.gameLevelType && !gameLevelType ? 'border-destructive' : ''}`}
+											>
+												<p className="font-semibold text-body">{tpl.title}</p>
+												<p className="text-caption text-muted-foreground">{tpl.goal}</p>
+											</button>
+										))}
+									</div>
+									{errors.gameLevelType && <p className="text-sm text-destructive mt-1">{errors.gameLevelType}</p>}
 								</div>
 								<div className="grid md:grid-cols-2 gap-4">
-									<div className="space-y-2">
-										<label className="text-sm font-medium">Main table name</label>
+									<div id="tableA" className="space-y-2">
+										<label className="text-sm font-medium">
+											Main table name <span className="text-error">*</span>
+										</label>
 										<Input
 											value={gameLevelConfig.tableA}
-											onChange={(e) => setGameLevelConfig(prev => ({ ...prev, tableA: e.target.value }))}
+											onChange={(e) => {
+												setGameLevelConfig(prev => ({ ...prev, tableA: e.target.value }));
+												if (errors.tableA) setErrors(prev => ({ ...prev, tableA: '' }));
+											}}
 											placeholder="students"
+											className={errors.tableA ? 'border-error border-2 focus-visible:ring-error' : ''}
 										/>
+										{errors.tableA && <p className="text-sm text-error font-medium mt-1">{errors.tableA}</p>}
 									</div>
 									<div className="space-y-2">
 										<label className="text-sm font-medium">Second table (if join)</label>
@@ -630,27 +724,46 @@ export default function CreateAssessmentPage() {
 											placeholder="courses"
 										/>
 									</div>
-									<div className="space-y-2 md:col-span-2">
-										<label className="text-sm font-medium">Columns / fields in play</label>
+									<div id="columns" className="space-y-2 md:col-span-2">
+										<label className="text-sm font-medium">
+											Columns / fields in play <span className="text-error">*</span>
+										</label>
 										<Input
 											value={gameLevelConfig.columns}
-											onChange={(e) => setGameLevelConfig(prev => ({ ...prev, columns: e.target.value }))}
+											onChange={(e) => {
+												setGameLevelConfig(prev => ({ ...prev, columns: e.target.value }));
+												if (errors.columns) setErrors(prev => ({ ...prev, columns: '' }));
+											}}
 											placeholder="name, email, grade"
+											className={errors.columns ? 'border-error border-2 focus-visible:ring-error' : ''}
 										/>
+										{errors.columns && <p className="text-sm text-error font-medium mt-1">{errors.columns}</p>}
 									</div>
-									<div className="space-y-2 md:col-span-2">
-										<label className="text-sm font-medium">Goal / notes shown to students</label>
+									<div id="notes" className="space-y-2 md:col-span-2">
+										<label className="text-sm font-medium">
+											Goal / notes shown to students <span className="text-error">*</span>
+										</label>
 										<textarea
-											className="w-full rounded border border-border px-3 py-2 text-sm"
+											className={`w-full rounded-lg border px-3 py-2 text-sm transition-all ${
+												errors.notes 
+													? 'border-error border-2 focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-2' 
+													: 'border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
+											}`}
 											value={gameLevelConfig.notes}
-											onChange={(e) => setGameLevelConfig(prev => ({ ...prev, notes: e.target.value }))}
+											onChange={(e) => {
+												setGameLevelConfig(prev => ({ ...prev, notes: e.target.value }));
+												if (errors.notes) setErrors(prev => ({ ...prev, notes: '' }));
+											}}
 											rows={3}
 										/>
+										{errors.notes && <p className="text-sm text-error font-medium mt-1">{errors.notes}</p>}
 									</div>
 								</div>
 
-								<div className="space-y-3">
-									<p className="text-sm font-medium">Required block sequence (order matters)</p>
+								<div id="blockSequence" className="space-y-3">
+									<p className="text-sm font-medium">
+										Required block sequence (order matters) <span className="text-destructive">*</span>
+									</p>
 									<div className="flex flex-wrap gap-2">
 										{gameBlockLibrary.map(block => (
 											<Button
@@ -658,12 +771,16 @@ export default function CreateAssessmentPage() {
 												type="button"
 												variant="outline"
 												size="sm"
-												onClick={() => addBlockToSequence(block.type)}
+												onClick={() => {
+													addBlockToSequence(block.type);
+													if (errors.blockSequence) setErrors(prev => ({ ...prev, blockSequence: '' }));
+												}}
 											>
 												{block.label}
 											</Button>
 										))}
 									</div>
+									{errors.blockSequence && <p className="text-sm text-destructive">{errors.blockSequence}</p>}
 									<div className="space-y-2">
 										{gameLevelBlocks.length === 0 && (
 											<p className="text-caption text-muted-foreground">No blocks added yet.</p>
@@ -671,24 +788,30 @@ export default function CreateAssessmentPage() {
 										{gameLevelBlocks.map((blockItem, idx) => {
 											const block = gameBlockLibrary.find(b => b.type === blockItem.type);
 											return (
-												<div key={`${blockItem.type}_${idx}`} className="flex items-center gap-2 border rounded px-3 py-2 bg-white">
-													<input
-														className="flex-1 border rounded px-2 py-1 text-sm"
-														value={blockItem.label}
-														onChange={(e) => setGameLevelBlocks(prev => prev.map((b, i) => i === idx ? { ...b, label: e.target.value } : b))}
-														placeholder={block?.label || 'Block label'}
-													/>
-													<div className="flex items-center gap-1">
-														<Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(idx, -1)} title="Move up">
-															<ArrowUp className="h-4 w-4" />
-														</Button>
-														<Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(idx, 1)} title="Move down">
-															<ArrowDown className="h-4 w-4" />
-														</Button>
-														<Button type="button" size="icon" variant="ghost" onClick={() => removeBlockFromSequence(idx)} title="Remove">
-															<X className="h-4 w-4" />
-														</Button>
+												<div key={`${blockItem.type}_${idx}`} className="space-y-1">
+													<div className="flex items-center gap-2 border rounded px-3 py-2 bg-white">
+														<input
+															className={`flex-1 border rounded px-2 py-1 text-sm ${errors[`blockLabel_${idx}`] ? 'border-destructive' : ''}`}
+															value={blockItem.label}
+															onChange={(e) => {
+																setGameLevelBlocks(prev => prev.map((b, i) => i === idx ? { ...b, label: e.target.value } : b));
+																if (errors[`blockLabel_${idx}`]) setErrors(prev => ({ ...prev, [`blockLabel_${idx}`]: '' }));
+															}}
+															placeholder={block?.label || 'Block label'}
+														/>
+														<div className="flex items-center gap-1">
+															<Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(idx, -1)} title="Move up">
+																<ArrowUp className="h-4 w-4" />
+															</Button>
+															<Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(idx, 1)} title="Move down">
+																<ArrowDown className="h-4 w-4" />
+															</Button>
+															<Button type="button" size="icon" variant="ghost" onClick={() => removeBlockFromSequence(idx)} title="Remove">
+																<X className="h-4 w-4" />
+															</Button>
+														</div>
 													</div>
+													{errors[`blockLabel_${idx}`] && <p className="text-sm text-destructive ml-1">{errors[`blockLabel_${idx}`]}</p>}
 												</div>
 											);
 										})}
@@ -716,6 +839,7 @@ export default function CreateAssessmentPage() {
 								</div>
 							</CardHeader>
 							<CardContent className="space-y-6">
+								{errors.questions && <p className="text-sm text-destructive mb-2">{errors.questions}</p>}
 								{questions.length === 0 ? (
 									<div className="text-center py-8 text-muted-foreground">
 										<p>No questions added yet. Click "Add Question" to get started.</p>
@@ -756,51 +880,68 @@ export default function CreateAssessmentPage() {
 												</label>
 												<Input
 													value={question.question}
-													onChange={(e) => updateQuestion(question.id, 'question', e.target.value)}
+													onChange={(e) => {
+														updateQuestion(question.id, 'question', e.target.value);
+														if (errors[`question_${index}`]) setErrors(prev => ({ ...prev, [`question_${index}`]: '' }));
+													}}
 													placeholder="Enter your question here..."
 													required
+													className={errors[`question_${index}`] ? 'border-destructive' : ''}
 												/>
+												{errors[`question_${index}`] && <p className="text-sm text-destructive mt-1">{errors[`question_${index}`]}</p>}
 											</div>
 
 											{question.type === 'mcq' ? (
 												<div className="space-y-3">
 													<div className="flex items-center justify-between">
-														<label className="block text-sm font-medium">Answer Options</label>
+														<label className="block text-sm font-medium">
+															Answer Options <span className="text-destructive">*</span>
+														</label>
 														<Button
 															type="button"
 															variant="ghost"
 															size="sm"
-															onClick={() => addOption(question.id)}
+															onClick={() => {
+																addOption(question.id);
+																if (errors[`questionOptions_${index}`]) setErrors(prev => ({ ...prev, [`questionOptions_${index}`]: '' }));
+															}}
 														>
 															<Plus className="h-5 w-5 mr-1" />
 															Add Option
 														</Button>
 													</div>
+													{errors[`questionOptions_${index}`] && <p className="text-sm text-destructive">{errors[`questionOptions_${index}`]}</p>}
 													{question.options.map((option, optIndex) => (
-														<div key={optIndex} className="flex items-center gap-2">
-															<input
-																type="radio"
-																name={`correct_${question.id}`}
-																checked={question.correctAnswer === optIndex}
-																onChange={() => updateQuestion(question.id, 'correctAnswer', optIndex)}
-																className="w-5 h-5"
-															/>
-															<Input
-																value={option}
-																onChange={(e) => updateQuestionOption(question.id, optIndex, e.target.value)}
-																placeholder={`Option ${optIndex + 1}`}
-																className="flex-1"
-															/>
-															{question.options.length > 2 && (
-																<Button
-																	type="button"
-																	variant="ghost"
-																	size="sm"
-																	onClick={() => removeOption(question.id, optIndex)}
-																>
-																	<X className="h-5 w-5" />
-																</Button>
-															)}
+														<div key={optIndex} className="space-y-1">
+															<div className="flex items-center gap-2">
+																<input
+																	type="radio"
+																	name={`correct_${question.id}`}
+																	checked={question.correctAnswer === optIndex}
+																	onChange={() => updateQuestion(question.id, 'correctAnswer', optIndex)}
+																	className="w-5 h-5"
+																/>
+																<Input
+																	value={option}
+																	onChange={(e) => {
+																		updateQuestionOption(question.id, optIndex, e.target.value);
+																		if (errors[`questionOption_${index}_${optIndex}`]) setErrors(prev => ({ ...prev, [`questionOption_${index}_${optIndex}`]: '' }));
+																	}}
+																	placeholder={`Option ${optIndex + 1}`}
+																	className={`flex-1 ${errors[`questionOption_${index}_${optIndex}`] ? 'border-destructive' : ''}`}
+																/>
+																{question.options.length > 2 && (
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		onClick={() => removeOption(question.id, optIndex)}
+																	>
+																		<X className="h-5 w-5" />
+																	</Button>
+																)}
+															</div>
+															{errors[`questionOption_${index}_${optIndex}`] && <p className="text-sm text-destructive ml-7">{errors[`questionOption_${index}_${optIndex}`]}</p>}
 														</div>
 													))}
 													<p className="text-xs text-muted-foreground">
