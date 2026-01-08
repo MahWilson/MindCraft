@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -25,6 +25,7 @@ export default function CourseDetailPage() {
 	const [role, setRole] = useState(null);
 	const [isEnrolled, setIsEnrolled] = useState(false);
 	const [enrollmentLoading, setEnrollmentLoading] = useState(true);
+	const [enrollmentProgress, setEnrollmentProgress] = useState(null);
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -43,6 +44,17 @@ export default function CourseDetailPage() {
 							const enrollmentDoc = await getDoc(enrollmentRef);
 							const enrolled = enrollmentDoc.exists();
 							setIsEnrolled(enrolled);
+							
+							// Load enrollment progress
+							if (enrolled && enrollmentDoc.exists()) {
+								const enrollmentData = enrollmentDoc.data();
+								setEnrollmentProgress(enrollmentData.progress || {
+									completedModules: [],
+									completedLessons: [],
+									overallProgress: 0,
+								});
+							}
+							
 							console.log('Enrollment check:', { enrollmentId, enrolled, courseId, userId: user.uid });
 						} catch (err) {
 							console.error('Error checking enrollment:', err);
@@ -67,6 +79,30 @@ export default function CourseDetailPage() {
 
 		return () => unsubscribe();
 	}, [courseId]);
+
+	// Listen for enrollment progress updates
+	useEffect(() => {
+		if (!userId || !courseId || role !== 'student') return;
+
+		const enrollmentId = `${userId}_${courseId}`;
+		const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+
+		// Use onSnapshot for real-time updates
+		const unsubscribe = onSnapshot(enrollmentRef, (doc) => {
+			if (doc.exists()) {
+				const enrollmentData = doc.data();
+				setEnrollmentProgress(enrollmentData.progress || {
+					completedModules: [],
+					completedLessons: [],
+					overallProgress: 0,
+				});
+			}
+		}, (err) => {
+			console.error('Error listening to enrollment:', err);
+		});
+
+		return () => unsubscribe();
+	}, [userId, courseId, role]);
 
 	useEffect(() => {
 		async function loadCourse() {
@@ -246,37 +282,39 @@ export default function CourseDetailPage() {
 	return (
 		<div className="space-y-8">
 			{/* Course Header */}
-			<div>
+			<div className="bg-gradient-to-br from-primary/5 via-background to-background rounded-xl p-6 border border-primary/10">
 				<div className="flex items-center gap-3 mb-4">
 					<Link href="/courses">
-						<Button variant="ghost" size="sm">← Back to Courses</Button>
+						<Button variant="ghost" size="sm" className="hover:bg-primary/10">
+							← Back to Courses
+						</Button>
 					</Link>
 				</div>
 				<div className="flex items-start justify-between gap-4">
 					<div className="flex-1">
-						<h1 className="text-h1 text-neutralDark mb-2">{course.title}</h1>
-						<p className="text-body text-muted-foreground mb-4">{course.description || 'No description'}</p>
-						<div className="flex items-center gap-4 text-caption text-muted-foreground">
-							<div className="flex items-center gap-2">
+						<h1 className="text-h1 text-neutralDark mb-3 font-bold">{course.title}</h1>
+						<p className="text-body text-muted-foreground mb-5 leading-relaxed">{course.description || 'No description'}</p>
+						<div className="flex items-center gap-6 text-caption text-muted-foreground">
+							<div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background border border-border">
 								<User className="h-4 w-4" />
-								<span>By: {course.authorName || 'Unknown'}</span>
+								<span className="font-medium">By: {course.authorName || 'Unknown'}</span>
 							</div>
 							{course.modules && (
-								<div className="flex items-center gap-2">
+								<div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background border border-border">
 									<BookOpen className="h-4 w-4" />
-									<span>{course.modules.length} {course.modules.length === 1 ? 'Module' : 'Modules'}</span>
+									<span className="font-medium">{course.modules.length} {course.modules.length === 1 ? 'Module' : 'Modules'}</span>
 								</div>
 							)}
 						</div>
 					</div>
 					{canEnroll && (
-						<Button onClick={handleEnroll} size="lg" disabled={loading}>
+						<Button onClick={handleEnroll} size="lg" disabled={loading} className="shadow-md hover:shadow-lg transition-shadow">
 							{loading ? 'Enrolling...' : 'Enroll in Course'}
 						</Button>
 					)}
 					{isEnrolled && (
-						<span className="px-4 py-2 rounded-lg bg-success/10 text-success text-caption font-medium flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4" />
+						<span className="px-5 py-2.5 rounded-lg bg-success/10 text-success text-body font-semibold flex items-center gap-2 border border-success/20 shadow-sm">
+							<CheckCircle2 className="h-5 w-5" />
 							Enrolled
 						</span>
 					)}
@@ -291,24 +329,34 @@ export default function CourseDetailPage() {
 			{/* Modules & Lessons Structure */}
 			{modules.length > 0 ? (
 				<div className="space-y-6">
-					<h2 className="text-h2 text-neutralDark">Course Content</h2>
+					<div className="flex items-center gap-3 mb-2">
+						<BookOpen className="h-6 w-6 text-primary" />
+						<h2 className="text-h2 text-neutralDark font-bold">Course Content</h2>
+					</div>
 					{modules.map((module, moduleIndex) => {
 						const moduleLessons = lessons[module.id] || [];
 						const isModuleLocked = isStudent && !isEnrolled && moduleIndex > 0;
 						
+						// Calculate completion progress for this module
+						let completedCount = 0;
+						if (isStudent && isEnrolled && enrollmentProgress && moduleLessons.length > 0) {
+							const completedLessons = enrollmentProgress.completedLessons || [];
+							completedCount = moduleLessons.filter(lesson => completedLessons.includes(lesson.id)).length;
+						}
+						
 						return (
-							<Card key={module.id} className={isModuleLocked ? 'opacity-60' : ''}>
+							<Card key={module.id} className={`relative ${isModuleLocked ? 'opacity-60' : ''} transition-all duration-200 hover:shadow-lg`}>
 								<CardHeader>
 									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-3">
+										<div className="flex items-center gap-3 flex-1">
 											{isModuleLocked ? (
 												<Lock className="h-5 w-5 text-muted-foreground" />
 											) : (
-												<div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-body font-semibold">
+												<div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white text-body font-semibold shadow-md">
 													{moduleIndex + 1}
 												</div>
 											)}
-											<div>
+											<div className="flex-1">
 												<CardTitle className="text-h3">{module.title}</CardTitle>
 												{moduleLessons.length > 0 && (
 													<CardDescription className="mt-1">
@@ -317,6 +365,14 @@ export default function CourseDetailPage() {
 												)}
 											</div>
 										</div>
+										{/* Progress Badge */}
+										{isStudent && isEnrolled && moduleLessons.length > 0 && (
+											<div className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+												<span className="text-body font-semibold text-primary">
+													{completedCount} of {moduleLessons.length} complete
+												</span>
+											</div>
+										)}
 									</div>
 								</CardHeader>
 								<CardContent>
@@ -324,26 +380,39 @@ export default function CourseDetailPage() {
 										<div className="space-y-2">
 											{moduleLessons.map((lesson, lessonIndex) => {
 												const isLessonLocked = isModuleLocked || (isStudent && !isEnrolled);
+												const isLessonCompleted = isStudent && isEnrolled && enrollmentProgress && 
+													(enrollmentProgress.completedLessons || []).includes(lesson.id);
 												
 												return (
 													<Link
 														key={lesson.id}
 														href={isLessonLocked ? '#' : `/courses/${courseId}/modules/${module.id}/lessons/${lesson.id}`}
-														className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 ${
+														className={`flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 ${
 															isLessonLocked
 																? 'border-border bg-neutralLight cursor-not-allowed opacity-60'
+																: isLessonCompleted
+																? 'border-success/30 bg-success/5 hover:border-success/50 hover:bg-success/10 cursor-pointer'
 																: 'border-border hover:border-primary hover:bg-primary/5 cursor-pointer'
 														}`}
 													>
 														{isLessonLocked ? (
 															<Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+														) : isLessonCompleted ? (
+															<CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
 														) : (
-															<div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-caption font-medium flex-shrink-0">
+															<div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-caption font-semibold flex-shrink-0">
 																{lessonIndex + 1}
 															</div>
 														)}
 														<div className="flex-1 min-w-0">
-															<h4 className="text-body font-medium text-neutralDark">{lesson.title}</h4>
+															<div className="flex items-center gap-2">
+																<h4 className="text-body font-medium text-neutralDark">{lesson.title}</h4>
+																{isLessonCompleted && (
+																	<span className="px-2 py-0.5 rounded text-caption font-medium bg-success/20 text-success">
+																		Completed
+																	</span>
+																)}
+															</div>
 															{lesson.contentHtml && (
 																<p className="text-caption text-muted-foreground mt-1 line-clamp-1">
 																	{lesson.contentHtml.replace(/<[^>]*>/g, '').substring(0, 60)}...
