@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { query, collection, where, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, BookOpen, Download, FileText, File, ShieldCheck, List, Eye, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Download, FileText, File, ShieldCheck, List, Eye, X, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -43,6 +43,8 @@ export default function LessonPage() {
 	const [accessChecked, setAccessChecked] = useState(false);
 	const [viewingMaterial, setViewingMaterial] = useState(null);
 	const [textContent, setTextContent] = useState({});
+	const [isLessonCompleted, setIsLessonCompleted] = useState(false);
+	const [completingLesson, setCompletingLesson] = useState(false);
 
 	useEffect(() => {
 		// Track signed-in user for material downloads and check access
@@ -57,13 +59,21 @@ export default function LessonPage() {
 						const role = userDoc.data().role;
 						setUserRole(role);
 						
-						// For students, check enrollment
+						// For students, check enrollment and lesson completion
 						if (role === 'student') {
 							try {
 								const enrollmentId = `${currentUser.uid}_${courseId}`;
 								const enrollmentDoc = await getDoc(doc(db, 'enrollment', enrollmentId));
 								const enrolled = enrollmentDoc.exists();
 								setIsEnrolled(enrolled);
+								
+								// Check if lesson is completed
+								if (enrolled && lessonId) {
+									const enrollmentData = enrollmentDoc.data();
+									const completedLessons = enrollmentData?.progress?.completedLessons || [];
+									setIsLessonCompleted(completedLessons.includes(lessonId));
+								}
+								
 								console.log('Enrollment check:', { enrollmentId, enrolled, courseId, userId: currentUser.uid });
 							} catch (err) {
 								console.error('Error checking enrollment:', err);
@@ -414,6 +424,50 @@ export default function LessonPage() {
 		}
 	}, [lesson]);
 
+	// Handle lesson completion
+	async function handleCompleteLesson() {
+		if (!user || !courseId || !lessonId || userRole !== 'student') return;
+
+		setCompletingLesson(true);
+		try {
+			const enrollmentId = `${user.uid}_${courseId}`;
+			const enrollmentRef = doc(db, 'enrollment', enrollmentId);
+			const enrollmentDoc = await getDoc(enrollmentRef);
+
+			if (!enrollmentDoc.exists()) {
+				alert('You must be enrolled in this course to complete lessons.');
+				setCompletingLesson(false);
+				return;
+			}
+
+			const enrollmentData = enrollmentDoc.data();
+			const completedLessons = enrollmentData?.progress?.completedLessons || [];
+
+			// Check if already completed
+			if (completedLessons.includes(lessonId)) {
+				setIsLessonCompleted(true);
+				setCompletingLesson(false);
+				return;
+			}
+
+			// Update enrollment with completed lesson
+			await updateDoc(enrollmentRef, {
+				'progress.completedLessons': arrayUnion(lessonId),
+				updatedAt: serverTimestamp(),
+			});
+
+			setIsLessonCompleted(true);
+			
+			// Show success message
+			console.log('Lesson marked as complete');
+		} catch (err) {
+			console.error('Error completing lesson:', err);
+			alert('Failed to mark lesson as complete. Please try again.');
+		} finally {
+			setCompletingLesson(false);
+		}
+	}
+
 	// this is for downloading lesson materials from storage
 	async function handleDownload(material) {
 		if (!user) {
@@ -542,10 +596,10 @@ export default function LessonPage() {
 			</div>
 
 			{/* Lesson Content */}
-			<Card>
-				<CardHeader>
+			<Card className="shadow-lg border-2">
+				<CardHeader className="bg-gradient-to-r from-primary/5 to-background border-b-2">
 					<div className="flex items-center justify-between">
-						<CardTitle className="text-h2">{lesson.title}</CardTitle>
+						<CardTitle className="text-h2 font-bold">{lesson.title}</CardTitle>
 						<div className="flex items-center gap-2">
 							{/* Download Dropdown */}
 							{lesson.contentHtml && (
@@ -899,34 +953,62 @@ export default function LessonPage() {
 				</Card>
 			)}
 
-			{/* Lesson Navigation */}
-			<div className="flex items-center justify-between pt-4 border-t border-border">
-				{prevLesson ? (
-					<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${prevLesson.id}`}>
-						<Button variant="outline">
-							<ArrowLeft className="h-5 w-5 mr-2 text-neutralDark" />
-							Previous Lesson
+			{/* Lesson Completion and Navigation */}
+			<div className="space-y-4 pt-4 border-t border-border">
+				{/* Complete Lesson Button (for students only) */}
+				{userRole === 'student' && isEnrolled && !isLessonCompleted && (
+					<div className="flex justify-center">
+						<Button
+							onClick={handleCompleteLesson}
+							disabled={completingLesson}
+							size="lg"
+							className="flex items-center gap-2 px-6 py-3"
+						>
+							<CheckCircle2 className="h-5 w-5" />
+							{completingLesson ? 'Marking as Complete...' : 'Complete Lesson'}
 						</Button>
-					</Link>
-				) : (
-					<div></div>
+					</div>
+				)}
+				
+				{/* Completion Status */}
+				{userRole === 'student' && isEnrolled && isLessonCompleted && (
+					<div className="flex justify-center">
+						<div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success/10 text-success border border-success/20">
+							<CheckCircle2 className="h-5 w-5" />
+							<span className="text-body font-medium">Lesson Completed</span>
+						</div>
+					</div>
 				)}
 
-				{nextLesson ? (
-					<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${nextLesson.id}`}>
-						<Button>
-							Next Lesson
-							<ArrowRight className="h-5 w-5 ml-2 text-white" />
-						</Button>
-					</Link>
-				) : (
-					<Link href={`/courses/${courseId}`}>
-						<Button variant="outline">
-							Complete Module
-							<BookOpen className="h-5 w-5 ml-2 text-neutralDark" />
-						</Button>
-					</Link>
-				)}
+				{/* Lesson Navigation */}
+				<div className="flex items-center justify-between">
+					{prevLesson ? (
+						<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${prevLesson.id}`}>
+							<Button variant="outline">
+								<ArrowLeft className="h-5 w-5 mr-2 text-neutralDark" />
+								Previous Lesson
+							</Button>
+						</Link>
+					) : (
+						<div></div>
+					)}
+
+					{nextLesson ? (
+						<Link href={`/courses/${courseId}/modules/${moduleId}/lessons/${nextLesson.id}`}>
+							<Button>
+								Next Lesson
+								<ArrowRight className="h-5 w-5 ml-2 text-white" />
+							</Button>
+						</Link>
+					) : (
+						<Link href={`/courses/${courseId}`}>
+							<Button variant="outline">
+								<BookOpen className="h-5 w-5 mr-2 text-neutralDark" />
+								Back to Course
+							</Button>
+						</Link>
+					)}
+				</div>
 			</div>
 			</div>
 

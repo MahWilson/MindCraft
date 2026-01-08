@@ -482,22 +482,26 @@ export default function AdminCoursesPage() {
 							</div>
 
 							{/* View mode */}
-							<div className="flex items-center gap-2 border-l border-border pl-4">
-								<label className="text-caption text-muted-foreground">{t.viewMode}:</label>
-								<div className="flex gap-1">
+							<div className="flex items-center gap-3 border-l border-border pl-4">
+								<label className="text-body font-medium text-neutralDark">{t.viewMode}:</label>
+								<div className="flex gap-2">
 									<Button
 										variant={viewMode === 'grid' ? 'default' : 'outline'}
-										size="sm"
+										size="default"
 										onClick={() => setViewMode('grid')}
+										className="flex items-center gap-2 px-4 py-2"
 									>
-										<Grid3x3 className="h-4 w-4" />
+										<Grid3x3 className="h-5 w-5" />
+										<span className="text-body font-medium">{t.gridView}</span>
 									</Button>
 									<Button
 										variant={viewMode === 'list' ? 'default' : 'outline'}
-										size="sm"
+										size="default"
 										onClick={() => setViewMode('list')}
+										className="flex items-center gap-2 px-4 py-2"
 									>
-										<List className="h-4 w-4" />
+										<List className="h-5 w-5" />
+										<span className="text-body font-medium">{t.listView}</span>
 									</Button>
 								</div>
 							</div>
